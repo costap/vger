@@ -34,6 +34,8 @@ var scanCmd = &cobra.Command{
 			return err
 		}
 
+		report.Stardate = ui.Stardate()
+
 		ui.Complete("Analysis complete. Captain.")
 
 		// Render report

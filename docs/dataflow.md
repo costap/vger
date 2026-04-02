@@ -9,14 +9,14 @@ Sequential execution. The agent layer acts as a coordinator, calling each port i
 ```mermaid
 flowchart TD
     subgraph CLI ["CLI Layer (internal/cli)"]
-        A([operator]) -->|"vger scan <url>"| B[scan command\nscan.go]
-        B -->|"url string"| C[ScanAgent\nagent/react.go]
+        A([operator]) -->|"vger scan url"| B["scan command / scan.go"]
+        B -->|"url string"| C["ScanAgent / agent/react.go"]
     end
 
     subgraph Agent ["Agent Layer (internal/agent)"]
-        C -->|"url string"| D[FetchMetadata\ndomain.MetadataFetcher]
-        D -->|"*domain.VideoMetadata"| E[AnalyseVideo\ndomain.VideoAnalyser]
-        E -->|"*domain.Report"| F[return to CLI]
+        C -->|"url string"| D["FetchMetadata / domain.MetadataFetcher"]
+        D -->|"domain.VideoMetadata"| E["AnalyseVideo / domain.VideoAnalyser"]
+        E -->|"domain.Report"| F[return to CLI]
     end
 
     subgraph Adapters ["Adapter Layer (internal/adapters)"]
@@ -25,15 +25,15 @@ flowchart TD
     end
 
     subgraph External ["External APIs"]
-        G -->|"videos.list\npart=snippet,contentDetails"| I[(YouTube Data API v3)]
-        I -->|"title, description,\nduration, channel"| G
-        H -->|"YouTube URL +\nmetadata as context"| J[(Gemini 2.5 Pro API)]
-        J -->|"summary + technology list\nas JSON"| H
+        G -->|"videos.list part=snippet,contentDetails"| I[(YouTube Data API v3)]
+        I -->|"title, description, duration, channel"| G
+        H -->|"YouTube URL + metadata as context"| J[(Gemini 2.5 Pro API)]
+        J -->|"summary + technology list as JSON"| H
     end
 
     subgraph Render ["CLI Render (internal/cli/ui)"]
-        F -->|"*domain.Report"| K[lcars.go\nrenderer]
-        K -->|"LCARS-styled\nterminal output"| L([terminal])
+        F -->|"domain.Report"| K["lcars.go renderer"]
+        K -->|"LCARS-styled terminal output"| L([terminal])
     end
 ```
 
@@ -60,25 +60,25 @@ The sequential pipeline in internal/agent/react.go is replaced by a LangChainGo 
 ```mermaid
 flowchart TD
     subgraph CLI ["CLI Layer (internal/cli)"]
-        A([operator]) -->|"vger scan <url>"| B[scan command]
-        B -->|"url string"| C[ReAct Agent\nLangChainGo]
+        A([operator]) -->|"vger scan url"| B[scan command]
+        B -->|"url string"| C["ReAct Agent / LangChainGo"]
     end
 
     subgraph AgentLoop ["Agent Loop (internal/agent)"]
-        C --> D{model\nreasoning}
-        D -->|"tool call:\nfetch_video_metadata"| E[MetadataFetcher\ntool wrapper]
-        E -->|"*VideoMetadata as JSON\nobservation"| D
-        D -->|"tool call:\nanalyse_video"| F[VideoAnalyser\ntool wrapper]
-        F -->|"*Report as JSON\nobservation"| D
-        D -->|"tool call:\nsearch_cncf_landscape\n(future)"| G[CNCF Landscape\ntool wrapper]
-        G -->|"project record\nor empty"| D
-        D -->|"final answer:\nno more tool calls"| H[assembled\n*domain.Report]
+        C --> D{"model reasoning"}
+        D -->|"tool: fetch_video_metadata"| E["MetadataFetcher tool wrapper"]
+        E -->|"VideoMetadata JSON observation"| D
+        D -->|"tool: analyse_video"| F["VideoAnalyser tool wrapper"]
+        F -->|"Report JSON observation"| D
+        D -->|"tool: search_cncf_landscape (future)"| G["CNCF Landscape tool wrapper"]
+        G -->|"project record or empty"| D
+        D -->|"final answer"| H["assembled domain.Report"]
     end
 
     subgraph Adapters ["Adapter Layer (internal/adapters)"]
         E --- I[youtube.Client]
         F --- J[gemini.Client]
-        G --- K[cncf.Client\n(future)]
+        G --- K["cncf.Client (future)"]
     end
 
     subgraph External ["External APIs"]
