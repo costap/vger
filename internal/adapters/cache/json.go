@@ -67,6 +67,22 @@ func (c *JSONCache) Load(_ context.Context, videoID string) (*domain.CachedAnaly
 	return &entry, nil
 }
 
+// LoadByVideoIDs loads multiple cached entries by video ID.
+// Entries that are not found in the cache are silently skipped.
+func (c *JSONCache) LoadByVideoIDs(ctx context.Context, videoIDs []string) ([]*domain.CachedAnalysis, error) {
+	var results []*domain.CachedAnalysis
+	for _, id := range videoIDs {
+		entry, err := c.Load(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if entry != nil {
+			results = append(results, entry)
+		}
+	}
+	return results, nil
+}
+
 func (c *JSONCache) path(videoID string) string {
 	return filepath.Join(c.dir, videoID+".json")
 }

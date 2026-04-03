@@ -61,3 +61,24 @@ type CachedAnalysis struct {
 	Report   Report        `json:"report"`
 }
 
+// TechCount records how many talks in a playlist mentioned a given technology.
+type TechCount struct {
+	Name  string
+	Count int
+}
+
+// PriorityTalk is a recommended talk from the AI synthesis layer.
+type PriorityTalk struct {
+	Title  string
+	URL    string
+	Reason string
+}
+
+// DigestReport is the output of the AI synthesis layer for a playlist.
+type DigestReport struct {
+	OverarchingTheme string
+	LearningPath     []string       // technology names in recommended study order
+	PriorityTalks    []PriorityTalk // top talks to watch first
+	KeyInsights      string         // freeform narrative of the most important takeaways
+}
+

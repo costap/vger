@@ -37,4 +37,5 @@ func init() {
 	Root.AddCommand(scanCmd)
 	Root.AddCommand(listCmd)
 	Root.AddCommand(askCmd)
+	Root.AddCommand(digestCmd)
 }
