@@ -27,17 +27,18 @@ func New(fetcher domain.MetadataFetcher, analyser domain.VideoAnalyser) *ScanAge
 	}
 }
 
-// Run executes the full analysis pipeline for the given URL and returns a Report.
-func (a *ScanAgent) Run(ctx context.Context, url string) (*domain.Report, error) {
+// Run executes the full analysis pipeline for the given URL and returns a Report
+// and the VideoMetadata that was fetched during analysis.
+func (a *ScanAgent) Run(ctx context.Context, url string) (*domain.Report, *domain.VideoMetadata, error) {
 	meta, err := a.fetcher.FetchMetadata(ctx, url)
 	if err != nil {
-		return nil, fmt.Errorf("metadata fetch: %w", err)
+		return nil, nil, fmt.Errorf("metadata fetch: %w", err)
 	}
 
 	report, err := a.analyser.AnalyseVideo(ctx, url, meta)
 	if err != nil {
-		return nil, fmt.Errorf("video analysis: %w", err)
+		return nil, nil, fmt.Errorf("video analysis: %w", err)
 	}
 
-	return report, nil
+	return report, meta, nil
 }

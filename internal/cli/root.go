@@ -35,4 +35,6 @@ func init() {
 	Root.PersistentFlags().StringVar(&geminiModel, "model", "gemini-2.5-flash", "Gemini model to use")
 
 	Root.AddCommand(scanCmd)
+	Root.AddCommand(listCmd)
+	Root.AddCommand(askCmd)
 }

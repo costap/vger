@@ -111,3 +111,17 @@ func Field(key, value string) {
 		bodyStyle.Render(value),
 	)
 }
+
+// ListingRow prints a numbered video listing row: index, date, title, url.
+func ListingRow(index int, publishedAt, title, url string) {
+	date := publishedAt
+	if len(date) >= 10 {
+		date = date[:10]
+	}
+	fmt.Printf("  %s  %s  %s\n    %s\n",
+		labelStyle.Render(fmt.Sprintf("%3d", index)),
+		dimStyle.Render(date),
+		bodyStyle.Render(title),
+		blueStyle.Render(url),
+	)
+}

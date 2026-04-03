@@ -18,6 +18,7 @@ You will be given a conference talk video. Analyse it and return a JSON object w
 
 {
   "summary": "<concise technical summary of the talk, 3-5 sentences>",
+  "notes": "<detailed freeform narrative covering EVERYTHING mentioned in the video: all technologies and projects (even brief mentions), speaker names and affiliations, demo highlights, code or architecture details shown, audience Q&A moments, and any quotes worth preserving. Write this as a thorough paragraph or set of paragraphs — this will be used to answer follow-up questions so err on the side of completeness>",
   "technologies": [
     {
       "name": "<technology or project name>",
@@ -30,11 +31,12 @@ You will be given a conference talk video. Analyse it and return a JSON object w
 }
 
 Return only the JSON object. Do not wrap it in markdown code fences. Do not add commentary outside the JSON.
-Focus on technologies, projects, and tools that are novel or worth learning more about.`
+Focus the technologies list on projects that are novel or worth learning more about. The notes field should be exhaustive.`
 
 // analysisResponse mirrors the JSON schema requested from the model.
 type analysisResponse struct {
 	Summary      string               `json:"summary"`
+	Notes        string               `json:"notes"`
 	Technologies []technologyResponse `json:"technologies"`
 }
 
@@ -115,9 +117,11 @@ func (c *Client) AnalyseVideo(ctx context.Context, url string, meta *domain.Vide
 	}
 
 	report := &domain.Report{
-		VideoTitle: meta.Title,
-		VideoURL:   url,
-		Summary:    ar.Summary,
+		VideoTitle:       meta.Title,
+		VideoURL:         url,
+		VideoDurationSec: meta.DurationSec,
+		Summary:          ar.Summary,
+		Notes:            ar.Notes,
 	}
 	for _, t := range ar.Technologies {
 		report.Technologies = append(report.Technologies, domain.Technology{
