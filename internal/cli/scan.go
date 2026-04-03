@@ -23,7 +23,7 @@ var scanCmd = &cobra.Command{
 		ui.Status("Contacting YouTube metadata relay...")
 
 		ytClient := youtube.New(youtubeAPIKey)
-		gmClient := gemini.New(geminiAPIKey)
+		gmClient := gemini.New(geminiAPIKey, geminiModel)
 		a := agent.New(ytClient, gmClient)
 
 		ui.Status("Transmitting video to Gemini multimodal array...")

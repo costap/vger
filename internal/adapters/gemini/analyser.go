@@ -2,45 +2,147 @@ package gemini
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
+
+	"google.golang.org/genai"
 
 	"github.com/costap/vger/internal/domain"
 )
 
-// Client is a stub implementation of domain.VideoAnalyser using the Gemini 2.5 Pro API.
-// Replace the stub body with a real google.golang.org/genai call, passing the YouTube URL directly.
+const defaultModel = "gemini-2.5-flash"
+
+const systemPrompt = `You are an expert in cloud-native technology, Kubernetes, and the CNCF ecosystem.
+You will be given a conference talk video. Analyse it and return a JSON object with exactly this schema:
+
+{
+  "summary": "<concise technical summary of the talk, 3-5 sentences>",
+  "technologies": [
+    {
+      "name": "<technology or project name>",
+      "description": "<one sentence describing what it is>",
+      "why_relevant": "<why an engineer should pay attention to this>",
+      "learn_more": "<URL to official docs or project site>",
+      "cncf_stage": "<one of: graduated, incubating, sandbox, or empty string if not a CNCF project>"
+    }
+  ]
+}
+
+Return only the JSON object. Do not wrap it in markdown code fences. Do not add commentary outside the JSON.
+Focus on technologies, projects, and tools that are novel or worth learning more about.`
+
+// analysisResponse mirrors the JSON schema requested from the model.
+type analysisResponse struct {
+	Summary      string               `json:"summary"`
+	Technologies []technologyResponse `json:"technologies"`
+}
+
+type technologyResponse struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	WhyRelevant string `json:"why_relevant"`
+	LearnMore   string `json:"learn_more"`
+	CNCFStage   string `json:"cncf_stage"`
+}
+
+// Client implements domain.VideoAnalyser using the Gemini API.
 type Client struct {
 	APIKey string
+	Model  string
 }
 
-func New(apiKey string) *Client {
-	return &Client{APIKey: apiKey}
+func New(apiKey, model string) *Client {
+	if model == "" {
+		model = defaultModel
+	}
+	return &Client{APIKey: apiKey, Model: model}
 }
 
-func (c *Client) AnalyseVideo(_ context.Context, url string, meta *domain.VideoMetadata) (*domain.Report, error) {
+// AnalyseVideo passes the video URL directly to the Gemini multimodal API
+// and returns a structured report. No video download is performed.
+func (c *Client) AnalyseVideo(ctx context.Context, url string, meta *domain.VideoMetadata) (*domain.Report, error) {
 	if url == "" {
 		return nil, fmt.Errorf("url must not be empty")
 	}
-	return &domain.Report{
-		VideoTitle: meta.Title,
-		VideoURL:   url,
-		Summary: "[stub] This talk introduced a novel approach to multi-cluster networking " +
-			"using eBPF-based CNI plugins, demonstrating zero-downtime failover across AWS and GCP regions.",
-		Technologies: []domain.Technology{
-			{
-				Name:        "Cilium",
-				Description: "eBPF-based Kubernetes CNI and network security platform.",
-				WhyRelevant: "Presented as the primary data-plane for cross-cluster traffic management.",
-				LearnMore:   "https://cilium.io",
-				CNCFStage:   "graduated",
-			},
-			{
-				Name:        "Gateway API",
-				Description: "Next-generation Kubernetes traffic routing API.",
-				WhyRelevant: "Used to express cross-cluster routing policies declaratively.",
-				LearnMore:   "https://gateway-api.sigs.k8s.io",
-				CNCFStage:   "",
+
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey:  c.APIKey,
+		Backend: genai.BackendGeminiAPI,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create gemini client: %w", err)
+	}
+
+	contents := []*genai.Content{
+		{
+			Role: "user",
+			Parts: []*genai.Part{
+				{Text: systemPrompt},
+				{
+					FileData: &genai.FileData{
+						FileURI:  url,
+						MIMEType: "video/mp4",
+					},
+				},
+				{
+					Text: fmt.Sprintf("Video title: %s\nChannel: %s\nPublished: %s",
+						meta.Title, meta.ChannelName, meta.PublishedAt),
+				},
 			},
 		},
-	}, nil
+	}
+
+	config := &genai.GenerateContentConfig{
+		ResponseMIMEType: "application/json",
+	}
+
+	resp, err := client.Models.GenerateContent(ctx, c.Model, contents, config)
+	if err != nil {
+		return nil, fmt.Errorf("gemini generate content: %w", err)
+	}
+
+	raw := resp.Text()
+	if raw == "" {
+		return nil, fmt.Errorf("empty response from gemini")
+	}
+
+	raw = stripCodeFences(raw)
+
+	var ar analysisResponse
+	if err := json.Unmarshal([]byte(raw), &ar); err != nil {
+		return nil, fmt.Errorf("unmarshal gemini response: %w (raw: %.200s)", err, raw)
+	}
+
+	report := &domain.Report{
+		VideoTitle: meta.Title,
+		VideoURL:   url,
+		Summary:    ar.Summary,
+	}
+	for _, t := range ar.Technologies {
+		report.Technologies = append(report.Technologies, domain.Technology{
+			Name:        t.Name,
+			Description: t.Description,
+			WhyRelevant: t.WhyRelevant,
+			LearnMore:   t.LearnMore,
+			CNCFStage:   t.CNCFStage,
+		})
+	}
+
+	return report, nil
+}
+
+// stripCodeFences removes markdown ```json ... ``` or ``` ... ``` wrappers
+// that the model may produce despite being instructed not to.
+func stripCodeFences(s string) string {
+	s = strings.TrimSpace(s)
+	for _, fence := range []string{"```json", "```"} {
+		if strings.HasPrefix(s, fence) {
+			s = strings.TrimPrefix(s, fence)
+			s = strings.TrimSuffix(s, "```")
+			s = strings.TrimSpace(s)
+			break
+		}
+	}
+	return s
 }

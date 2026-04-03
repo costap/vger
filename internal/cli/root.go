@@ -9,6 +9,7 @@ import (
 
 var geminiAPIKey string
 var youtubeAPIKey string
+var geminiModel string
 
 // Root is the top-level cobra command.
 var Root = &cobra.Command{
@@ -31,6 +32,7 @@ and produces structured summaries with technology learning recommendations.`,
 func init() {
 	Root.PersistentFlags().StringVar(&geminiAPIKey, "gemini-key", "", "Gemini API key (env: GEMINI_API_KEY, .env)")
 	Root.PersistentFlags().StringVar(&youtubeAPIKey, "youtube-key", "", "YouTube Data API key (env: YOUTUBE_API_KEY, .env)")
+	Root.PersistentFlags().StringVar(&geminiModel, "model", "gemini-2.5-flash", "Gemini model to use")
 
 	Root.AddCommand(scanCmd)
 }
