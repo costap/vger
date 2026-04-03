@@ -1,0 +1,91 @@
+# .goreleaser.yaml — V'Ger release configuration
+# Run: goreleaser release --clean
+# Triggered automatically by .github/workflows/release.yml on git tag v*
+
+version: 2
+
+project_name: vger
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - id: vger
+    main: ./cmd/vger
+    binary: vger
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - id: vger
+    builds:
+      - vger
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - README.md
+      - LICENSE*
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - Merge pull request
+      - Merge branch
+
+release:
+  github:
+    owner: costap
+    name: vger
+  name_template: "V'Ger {{.Version}}"
+  header: |
+    ## V'Ger {{.Version}} — Stardate {{.Now.Format "2006.1"}}
+
+    > *"It has gathered so much knowledge... it wants to share it."*
+
+  footer: |
+    ---
+    **Full installation instructions:** see [README.md](https://github.com/costap/vger#installation)
+
+brews:
+  - name: vger
+    repository:
+      owner: costap
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    commit_msg_template: "chore: update vger formula to {{ .Tag }}"
+    homepage: "https://github.com/costap/vger"
+    description: "V'Ger — AI-powered conference video knowledge assimilation system"
+    license: "MIT"
+    test: |
+      system "#{bin}/vger", "--help"
+    install: |
+      bin.install "vger"
