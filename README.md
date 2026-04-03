@@ -30,10 +30,12 @@ cloud-native knowledge, and returns it to you in a form you can act on.
 ## MISSION PARAMETERS
 
 - Fetch video metadata from the YouTube Data API
-- Submit the video directly to **Gemini 2.5 Flash** for multimodal analysis
+- Browse channel video catalogues and playlists, search across complete upload history
+- Submit individual videos or entire playlists to **Gemini 2.5 Flash** for multimodal analysis
 - Extract a structured summary and a technology radar with CNCF project context
 - Cache all analysis locally so follow-up questions are instant and free
 - Answer follow-up questions from cached context — or re-submit the video for deep analysis
+- Generate playlist digests: technology radar across all talks, AI-synthesised learning paths
 
 ---
 
@@ -119,19 +121,33 @@ vger --youtube-key YOUR_KEY --gemini-key YOUR_KEY scan <url>
 
 ## COMMAND REFERENCE
 
-### `vger scan` — Analyse a video
+### `vger scan` — Analyse a video or playlist
 
 Submits a conference video to Gemini for full multimodal analysis.
 Results are cached to `~/.vger/cache/` for instant follow-up queries.
 
 ```bash
+# Single video
 vger scan <youtube-url>
+
+# Entire playlist (parallel, resumable)
+vger scan --playlist <playlist-id-or-url>
 ```
 
-**Example:**
+**Examples:**
 
 ```bash
+# Scan a single talk
 vger scan https://www.youtube.com/watch?v=H06qrNmGqyE
+
+# Scan all videos in a playlist (3 parallel by default)
+vger scan --playlist "https://www.youtube.com/playlist?list=PLj6h78yzYM2P..."
+
+# Faster on a paid Gemini tier
+vger scan --playlist PLj6h78yzYM2P... --concurrency 5
+
+# Re-scan everything, ignoring the cache
+vger scan --playlist PLj6h78yzYM2P... --refresh
 ```
 
 **Output includes:**
@@ -139,22 +155,35 @@ vger scan https://www.youtube.com/watch?v=H06qrNmGqyE
 - 3–5 sentence technical summary
 - Technology radar: each identified project with description, CNCF stage, why it matters, and where to learn more
 
+Playlist scans are **resumable** — already-cached videos are skipped automatically.
+Re-run after an interruption and V'Ger picks up where it left off.
+
 **Flags:**
 
-| Flag | Description |
-|------|-------------|
-| `--refresh` | Force re-analysis even if a cached result exists |
-| `--model` | Override the Gemini model (default: `gemini-2.5-flash`) |
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--playlist` | — | Playlist ID or URL — scan all videos in the playlist |
+| `--concurrency` | `3` | Number of parallel analyses in playlist mode |
+| `--refresh` | `false` | Force re-analysis even if a cached result exists |
+| `--model` | `gemini-2.5-flash` | Override the Gemini model |
 
 ---
 
-### `vger list` — Browse a channel's videos
+### `vger list` — Browse a channel's videos or playlists
 
-Lists videos from a YouTube channel ordered by publish date, newest first.
-Supports searching by title and description to find specific events.
+Lists videos or playlists from a YouTube channel ordered by publish date, newest first.
+Results are retrieved by walking the channel's **complete upload history** — not limited
+by YouTube's search index, so all videos are found regardless of age.
 
 ```bash
-vger list --channel <channel-id-or-handle> [--search <query>] [--max <n>]
+# List videos from a channel
+vger list --channel <channel-id-or-handle>
+
+# List a channel's playlists
+vger list --channel <channel-id-or-handle> --playlists
+
+# List videos inside a specific playlist
+vger list --playlist <playlist-id-or-url>
 ```
 
 **Examples:**
@@ -163,20 +192,31 @@ vger list --channel <channel-id-or-handle> [--search <query>] [--max <n>]
 # Browse the CNCF channel
 vger list --channel @cncf
 
-# Find all KubeCon talks
-vger list --channel @cncf --search kubecon
+# Find all ArgoCD talks (scans full upload history)
+vger list --channel @cncf --search argocon
 
-# Narrow to KubeCon 2024, more results
-vger list --channel @cncf --search "kubecon 2024" --max 50
+# List all playlists on the CNCF channel
+vger list --channel @cncf --playlists
+
+# Filter playlists by name
+vger list --channel @cncf --playlists --search kubecon
+
+# List all videos in a specific playlist
+vger list --playlist "https://www.youtube.com/playlist?list=PLj6h78yzYM2P..."
+
+# Filter playlist videos by keyword
+vger list --playlist PLj6h78yzYM2P... --search "service mesh"
 ```
 
 **Flags:**
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--channel` | required | Channel ID (`UCxx...`) or handle (`@cncf`) |
+| `--channel` | — | Channel ID (`UCxx...`) or handle (`@cncf`) |
+| `--playlist` | — | Playlist ID or URL — list videos from a specific playlist |
+| `--playlists` | `false` | List playlists instead of videos |
 | `--search` | — | Filter by title/description keyword |
-| `--max` | 25 | Maximum results (1–50) |
+| `--max` | `50` | Maximum number of results |
 
 ---
 
@@ -226,10 +266,49 @@ vger ask --deep https://www.youtube.com/watch?v=H06qrNmGqyE \
 
 ---
 
-## TYPICAL WORKFLOW
+### `vger digest` — Playlist overview and learning path
+
+After scanning a playlist, produce a cross-talk overview without re-running any analysis.
+
+**Layer 1 (always, zero API cost):** reads all cached analyses and renders:
+- Compact talk table with duration and top technologies per talk
+- Technology radar — bar chart of which technologies appeared across how many talks
+
+**Layer 2 (`--ai`, one Gemini text call):** AI synthesis across all talks:
+- Overarching theme of the playlist
+- Recommended learning path (technologies in study order)
+- 3–5 priority talks to watch first with reasons
+- Key insights narrative
 
 ```bash
-# 1. Find KubeCon talks you want to analyse
+# Local overview — instant, no API call
+vger digest --playlist <playlist-id-or-url>
+
+# + AI synthesis
+vger digest --playlist <playlist-id-or-url> --ai
+
+# Export a shareable Markdown report
+vger digest --playlist <playlist-id-or-url> --ai --output kubecon2024.md
+```
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--playlist` | Playlist ID or URL (required) |
+| `--ai` | Use Gemini to synthesise a cross-playlist learning path |
+| `--output` | Write a Markdown report to a file |
+
+> `vger scan --playlist` must be run first to populate the cache.
+
+---
+
+## TYPICAL WORKFLOW
+
+### Single video
+
+```bash
+# 1. Find talks you want to analyse
 vger list --channel @cncf --search "kubecon 2024" --max 20
 
 # 2. Scan a talk — Gemini analyses the full video
@@ -242,6 +321,29 @@ vger ask https://www.youtube.com/watch?v=TALK_ID \
 # 4. Dig deeper into something specific (re-reads video)
 vger ask --deep https://www.youtube.com/watch?v=TALK_ID \
   "What did they say about multi-cluster networking?"
+```
+
+### Full playlist
+
+```bash
+# 1. Find the playlist you want
+vger list --channel @cncf --playlists --search kubecon
+
+# 2. Scan all videos in the playlist (resumable, cached per video)
+vger scan --playlist PLj6h78yzYM2P... --concurrency 3
+
+# 3. Get an instant overview — technology radar across all talks
+vger digest --playlist PLj6h78yzYM2P...
+
+# 4. Add AI synthesis — learning path and priority talks
+vger digest --playlist PLj6h78yzYM2P... --ai
+
+# 5. Export a shareable Markdown report
+vger digest --playlist PLj6h78yzYM2P... --ai --output kubecon2024.md
+
+# 6. Drill into a specific talk
+vger ask https://www.youtube.com/watch?v=TALK_ID \
+  "What was shown in the live demo?"
 ```
 
 ---
