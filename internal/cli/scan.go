@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/costap/vger/internal/adapters/cache"
+	"github.com/costap/vger/internal/adapters/cncf"
 	"github.com/costap/vger/internal/adapters/gemini"
 	"github.com/costap/vger/internal/adapters/youtube"
 	"github.com/costap/vger/internal/agent"
@@ -81,6 +82,11 @@ func runSingleScan(cmd *cobra.Command, url string) error {
 		return err
 	}
 
+	// Enrich: correct CNCF stages from live landscape data, validate URLs.
+	ui.Status("Cross-referencing CNCF landscape data...")
+	enricher := cncf.New(cacheDir)
+	_ = enricher.Enrich(cmd.Context(), report)
+
 	report.Stardate = ui.Stardate()
 
 	entry := &domain.CachedAnalysis{
@@ -134,6 +140,7 @@ func runPlaylistScan(cmd *cobra.Command) error {
 		return err
 	}
 	c := cache.New(cacheDir)
+	enricher := cncf.New(cacheDir)
 
 	total := len(videos)
 	ui.Status(fmt.Sprintf("Playlist: %s  |  %d videos  |  concurrency: %d", playlistID, total, scanConcurrency))
@@ -184,6 +191,7 @@ func runPlaylistScan(cmd *cobra.Command) error {
 				return
 			}
 
+			_ = enricher.Enrich(cmd.Context(), report)
 			report.Stardate = ui.Stardate()
 			entry := &domain.CachedAnalysis{
 				VideoID:  videoID,
