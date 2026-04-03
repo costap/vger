@@ -14,6 +14,12 @@ func (c *Client) ExtractVideoID(rawURL string) (string, error) {
 	return extractVideoID(rawURL)
 }
 
+// ExtractPlaylistID is the exported entry point for obtaining a playlist ID
+// from a YouTube playlist URL or a raw playlist ID.
+func (c *Client) ExtractPlaylistID(rawInput string) (string, error) {
+	return extractPlaylistID(rawInput)
+}
+
 // extractVideoID parses a YouTube video ID from any common URL format:
 //
 //	https://www.youtube.com/watch?v=ID
@@ -71,4 +77,27 @@ func parseISO8601Duration(d string) int {
 		return n
 	}
 	return toInt(m[1])*3600 + toInt(m[2])*60 + toInt(m[3])
+}
+
+// extractPlaylistID parses a YouTube playlist ID from a URL or returns the
+// input unchanged if it looks like a raw playlist ID (starts with "PL", "FL", etc.).
+//
+//	https://www.youtube.com/playlist?list=PLj6h78yzYM2P...
+//	https://youtube.com/watch?v=ID&list=PLj6h78yzYM2P...
+func extractPlaylistID(rawInput string) (string, error) {
+	if rawInput == "" {
+		return "", fmt.Errorf("playlist id or url must not be empty")
+	}
+
+	u, err := url.Parse(rawInput)
+	if err != nil || u.Scheme == "" {
+		// Not a URL — treat as a raw playlist ID.
+		return rawInput, nil
+	}
+
+	if list := u.Query().Get("list"); list != "" {
+		return list, nil
+	}
+
+	return "", fmt.Errorf("no playlist id found in url: %s", rawInput)
 }

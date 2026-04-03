@@ -38,40 +38,243 @@ func (c *Client) ResolveChannel(ctx context.Context, channelRef string) (string,
 	return ch.Id, ch.Snippet.Title, nil
 }
 
-// ListVideos returns up to maxResults videos from the given channel,
-// ordered by publish date descending. If query is non-empty, results are
-// filtered by the search term against title and description.
+// getUploadsPlaylistID returns the uploads playlist ID for a channel.
+// The uploads playlist contains every video the channel has ever published,
+// in reverse-chronological order.
+func (c *Client) getUploadsPlaylistID(ctx context.Context, channelID string) (string, error) {
+	svc, err := c.newService(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := svc.Channels.List([]string{"contentDetails"}).Id(channelID).Do()
+	if err != nil {
+		return "", fmt.Errorf("youtube channels.list (contentDetails): %w", err)
+	}
+	if len(resp.Items) == 0 {
+		return "", fmt.Errorf("channel not found: %s", channelID)
+	}
+
+	playlistID := resp.Items[0].ContentDetails.RelatedPlaylists.Uploads
+	if playlistID == "" {
+		return "", fmt.Errorf("no uploads playlist found for channel: %s", channelID)
+	}
+	return playlistID, nil
+}
+
+// ListVideos walks the channel's uploads playlist and returns up to maxResults
+// videos whose title or description contains query (case-insensitive).
+// When query is empty all videos are returned up to maxResults.
+//
+// Unlike search.list, this approach is comprehensive — it will find every
+// matching video regardless of age, popularity, or search index coverage.
+// It implements domain.ChannelLister.
 func (c *Client) ListVideos(ctx context.Context, channelID, query string, maxResults int64) ([]domain.VideoListing, error) {
+	listings, _, err := c.listVideosWithScanCount(ctx, channelID, query, maxResults)
+	return listings, err
+}
+
+// ListVideosDetailed is the same as ListVideos but also returns the total number
+// of playlist items scanned. Used by the CLI to display progress context.
+func (c *Client) ListVideosDetailed(ctx context.Context, channelID, query string, maxResults int64) (listings []domain.VideoListing, scanned int, err error) {
+	return c.listVideosWithScanCount(ctx, channelID, query, maxResults)
+}
+
+// listVideosWithScanCount is the shared implementation for ListVideos and
+// ListVideosDetailed.
+func (c *Client) listVideosWithScanCount(ctx context.Context, channelID, query string, maxResults int64) ([]domain.VideoListing, int, error) {
+	playlistID, err := c.getUploadsPlaylistID(ctx, channelID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	svc, err := c.newService(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	queryLower := strings.ToLower(query)
+	var listings []domain.VideoListing
+	scanned := 0
+	pageToken := ""
+
+	for {
+		call := svc.PlaylistItems.List([]string{"snippet"}).
+			PlaylistId(playlistID).
+			MaxResults(50) // API max per page
+
+		if pageToken != "" {
+			call = call.PageToken(pageToken)
+		}
+
+		resp, err := call.Do()
+		if err != nil {
+			return nil, scanned, fmt.Errorf("youtube playlistItems.list: %w", err)
+		}
+
+		for _, item := range resp.Items {
+			scanned++
+			sn := item.Snippet
+
+			// Skip deleted/private videos (resourceId.videoId will be empty or title will be "Deleted video")
+			if sn.ResourceId == nil || sn.ResourceId.VideoId == "" {
+				continue
+			}
+
+			if queryLower != "" {
+				titleMatch := strings.Contains(strings.ToLower(sn.Title), queryLower)
+				descMatch := strings.Contains(strings.ToLower(sn.Description), queryLower)
+				if !titleMatch && !descMatch {
+					continue
+				}
+			}
+
+			id := sn.ResourceId.VideoId
+			listings = append(listings, domain.VideoListing{
+				VideoID:     id,
+				Title:       sn.Title,
+				PublishedAt: sn.PublishedAt,
+				URL:         "https://www.youtube.com/watch?v=" + id,
+				Description: sn.Description,
+			})
+
+			if int64(len(listings)) >= maxResults {
+				return listings, scanned, nil
+			}
+		}
+
+		if resp.NextPageToken == "" {
+			break
+		}
+		pageToken = resp.NextPageToken
+	}
+
+	return listings, scanned, nil
+}
+
+// ListPlaylists returns up to maxResults playlists from the given channel ordered
+// by publication date descending. If query is non-empty, only playlists whose
+// title or description contain the query (case-insensitive) are returned.
+func (c *Client) ListPlaylists(ctx context.Context, channelID, query string, maxResults int64) ([]domain.PlaylistListing, error) {
 	svc, err := c.newService(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	call := svc.Search.List([]string{"id", "snippet"}).
-		ChannelId(channelID).
-		Type("video").
-		Order("date").
-		MaxResults(maxResults)
+	queryLower := strings.ToLower(query)
+	var results []domain.PlaylistListing
+	pageToken := ""
 
-	if query != "" {
-		call = call.Q(query)
+	for {
+		call := svc.Playlists.List([]string{"snippet", "contentDetails"}).
+			ChannelId(channelID).
+			MaxResults(50)
+
+		if pageToken != "" {
+			call = call.PageToken(pageToken)
+		}
+
+		resp, err := call.Do()
+		if err != nil {
+			return nil, fmt.Errorf("youtube playlists.list: %w", err)
+		}
+
+		for _, item := range resp.Items {
+			if queryLower != "" {
+				titleMatch := strings.Contains(strings.ToLower(item.Snippet.Title), queryLower)
+				descMatch := strings.Contains(strings.ToLower(item.Snippet.Description), queryLower)
+				if !titleMatch && !descMatch {
+					continue
+				}
+			}
+
+			results = append(results, domain.PlaylistListing{
+				PlaylistID:  item.Id,
+				Title:       item.Snippet.Title,
+				Description: item.Snippet.Description,
+				PublishedAt: item.Snippet.PublishedAt,
+				VideoCount:  item.ContentDetails.ItemCount,
+				URL:         "https://www.youtube.com/playlist?list=" + item.Id,
+			})
+
+			if int64(len(results)) >= maxResults {
+				return results, nil
+			}
+		}
+
+		if resp.NextPageToken == "" {
+			break
+		}
+		pageToken = resp.NextPageToken
 	}
 
-	resp, err := call.Do()
+	return results, nil
+}
+
+// ListPlaylistVideos returns up to maxResults videos from the given playlist ID,
+// in playlist order (newest-first for most YouTube playlists). If query is
+// non-empty, only videos whose title or description contain it are returned.
+// Accepts a raw playlist ID or a full YouTube playlist URL.
+func (c *Client) ListPlaylistVideos(ctx context.Context, playlistID, query string, maxResults int64) ([]domain.VideoListing, int, error) {
+	svc, err := c.newService(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("youtube search.list: %w", err)
+		return nil, 0, err
 	}
 
-	listings := make([]domain.VideoListing, 0, len(resp.Items))
-	for _, item := range resp.Items {
-		id := item.Id.VideoId
-		listings = append(listings, domain.VideoListing{
-			VideoID:     id,
-			Title:       item.Snippet.Title,
-			PublishedAt: item.Snippet.PublishedAt,
-			URL:         "https://www.youtube.com/watch?v=" + id,
-			Description: item.Snippet.Description,
-		})
+	queryLower := strings.ToLower(query)
+	var listings []domain.VideoListing
+	scanned := 0
+	pageToken := ""
+
+	for {
+		call := svc.PlaylistItems.List([]string{"snippet"}).
+			PlaylistId(playlistID).
+			MaxResults(50)
+
+		if pageToken != "" {
+			call = call.PageToken(pageToken)
+		}
+
+		resp, err := call.Do()
+		if err != nil {
+			return nil, scanned, fmt.Errorf("youtube playlistItems.list: %w", err)
+		}
+
+		for _, item := range resp.Items {
+			scanned++
+			sn := item.Snippet
+
+			if sn.ResourceId == nil || sn.ResourceId.VideoId == "" {
+				continue
+			}
+
+			if queryLower != "" {
+				titleMatch := strings.Contains(strings.ToLower(sn.Title), queryLower)
+				descMatch := strings.Contains(strings.ToLower(sn.Description), queryLower)
+				if !titleMatch && !descMatch {
+					continue
+				}
+			}
+
+			id := sn.ResourceId.VideoId
+			listings = append(listings, domain.VideoListing{
+				VideoID:     id,
+				Title:       sn.Title,
+				PublishedAt: sn.PublishedAt,
+				URL:         "https://www.youtube.com/watch?v=" + id,
+				Description: sn.Description,
+			})
+
+			if int64(len(listings)) >= maxResults {
+				return listings, scanned, nil
+			}
+		}
+
+		if resp.NextPageToken == "" {
+			break
+		}
+		pageToken = resp.NextPageToken
 	}
-	return listings, nil
+
+	return listings, scanned, nil
 }

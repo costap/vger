@@ -27,15 +27,14 @@ var (
 )
 
 const banner = `
- __   ___  _______  _______  ______  
-|  | /  / |       ||       ||    _ \ 
-|  |/  /  |    ___||    ___||   |_| |
-|     /   |   | __ |   |___ |    _  |
-|     \   |   ||  ||    ___||   | | |
-|  |\  \  |   |_| ||   |___ |   |_| |
-|__| \__| |_______||_______||______/ 
-
-  V ' G E R  —  K n o w l e d g e   A s s i m i l a t i o n   S y s t e m
+  ██╗   ██╗ ██████╗ ███████╗██████╗ 
+  ██║   ██║██╔════╝ ██╔════╝██╔══██╗
+  ██║   ██║██║  ███╗█████╗  ██████╔╝
+  ╚██╗ ██╔╝██║   ██║██╔══╝  ██╔══██╗
+   ╚████╔╝ ╚██████╔╝███████╗██║  ██║
+    ╚═══╝   ╚═════╝ ╚══════╝╚═╝  ╚═╝
+  ════════════════════════════════════
+  KNOWLEDGE  ASSIMILATION  UNIT  001
 `
 
 // Stardate returns a TNG-style stardate string derived from the current UTC time.
@@ -121,6 +120,21 @@ func ListingRow(index int, publishedAt, title, url string) {
 	fmt.Printf("  %s  %s  %s\n    %s\n",
 		labelStyle.Render(fmt.Sprintf("%3d", index)),
 		dimStyle.Render(date),
+		bodyStyle.Render(title),
+		blueStyle.Render(url),
+	)
+}
+
+// PlaylistRow prints a numbered playlist row: index, date, video count, title, url.
+func PlaylistRow(index int, publishedAt, title, url string, videoCount int64) {
+	date := publishedAt
+	if len(date) >= 10 {
+		date = date[:10]
+	}
+	fmt.Printf("  %s  %s  %s  %s\n    %s\n",
+		labelStyle.Render(fmt.Sprintf("%3d", index)),
+		dimStyle.Render(date),
+		dimStyle.Render(fmt.Sprintf("[%3d videos]", videoCount)),
 		bodyStyle.Render(title),
 		blueStyle.Render(url),
 	)

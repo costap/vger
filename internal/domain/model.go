@@ -21,6 +21,16 @@ type VideoListing struct {
 	Description string
 }
 
+// PlaylistListing is a lightweight entry returned when browsing a channel's playlists.
+type PlaylistListing struct {
+	PlaylistID  string
+	Title       string
+	Description string
+	PublishedAt string
+	VideoCount  int64
+	URL         string
+}
+
 // Technology represents a technology or project identified in the video.
 type Technology struct {
 	Name        string

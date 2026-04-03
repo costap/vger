@@ -12,8 +12,8 @@ type VideoAnalyser interface {
 	AnalyseVideo(ctx context.Context, url string, metadata *VideoMetadata) (*Report, error)
 }
 
-// ChannelLister retrieves a list of videos from a YouTube channel,
-// optionally filtered by a search query, ordered by publish date descending.
+// ChannelLister retrieves a list of videos or playlists from a YouTube channel,
+// optionally filtered by a search query.
 type ChannelLister interface {
 	// ResolveChannel accepts a channel ID (UCxx...) or a handle (@name / name)
 	// and returns the canonical channel ID and display name.
@@ -22,6 +22,10 @@ type ChannelLister interface {
 	// ListVideos returns up to maxResults videos from the given channel,
 	// newest first. If query is non-empty it filters by title and description.
 	ListVideos(ctx context.Context, channelID, query string, maxResults int64) ([]VideoListing, error)
+
+	// ListPlaylists returns up to maxResults playlists from the given channel,
+	// newest first. If query is non-empty it filters by title and description.
+	ListPlaylists(ctx context.Context, channelID, query string, maxResults int64) ([]PlaylistListing, error)
 }
 
 // AnalysisCache persists and retrieves completed scan results keyed by video ID.
