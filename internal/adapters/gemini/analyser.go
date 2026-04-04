@@ -206,6 +206,7 @@ func parseReport(raw string, meta *domain.VideoMetadata, url string) (*domain.Re
 	}
 
 	raw = stripCodeFences(raw)
+	raw = extractJSONObject(raw)
 
 	var ar analysisResponse
 	if err := json.Unmarshal([]byte(raw), &ar); err != nil {
@@ -230,6 +231,18 @@ func parseReport(raw string, meta *domain.VideoMetadata, url string) (*domain.Re
 	}
 
 	return report, nil
+}
+
+// extractJSONObject returns the substring from the first '{' to the last '}',
+// discarding any preamble or postamble text the model may add around the JSON
+// object when ResponseMIMEType is not enforced (e.g. in tool-calling mode).
+func extractJSONObject(s string) string {
+	start := strings.Index(s, "{")
+	end := strings.LastIndex(s, "}")
+	if start == -1 || end == -1 || end <= start {
+		return s // not a JSON object shape; return as-is and let unmarshal report the error
+	}
+	return s[start : end+1]
 }
 
 // stripCodeFences removes markdown ```json ... ``` or ``` ... ``` wrappers
