@@ -7,22 +7,26 @@ import (
 	"strings"
 	"time"
 
+	"github.com/costap/vger/internal/adapters/gemini"
 	"github.com/costap/vger/internal/adapters/signals"
 	"github.com/costap/vger/internal/cli/ui"
 	"github.com/costap/vger/internal/domain"
 	"github.com/spf13/cobra"
 )
 
+var trackAddAIPrompt string
+
 var trackAddCmd = &cobra.Command{
 	Use:   "add",
 	Short: "Capture a new technology signal",
 	Long: `Interactively capture a new technology or idea to track.
 
-You will be prompted for: title, URL, source, category, and a brief note
-explaining why you captured this signal.
+Without --ai: prompts for title, URL, source, category, and a brief note.
+With --ai: describe the signal in natural language; Gemini extracts the fields.
 
-Example:
-  vger track add`,
+Examples:
+  vger track add
+  vger track add --ai "saw a tweet about eBPF replacing sidecars https://..."`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sigDir, err := signals.DefaultDir()
 		if err != nil {
@@ -37,37 +41,59 @@ Example:
 			return err
 		}
 
-		ui.SectionHeader(fmt.Sprintf("new signal — %s", id))
-
-		r := bufio.NewReader(os.Stdin)
-
-		title := prompt(r, "Title")
-		if title == "" {
-			return fmt.Errorf("title is required")
-		}
-
-		url := prompt(r, "URL")
-		source := prompt(r, "Source (e.g. Blog post, Twitter/X, Colleague)")
-		if source == "" {
-			source = "Unknown"
-		}
-
-		category := promptChoice(r, "Category", domain.ValidSignalCategories, "other")
-		note := prompt(r, "Why captured (1-3 sentences)")
-
 		now := time.Now().UTC()
-		sig := &domain.Signal{
-			ID:        id,
-			Title:     title,
-			Date:      now.Format("2006-01-02"),
-			Source:    source,
-			URL:       url,
-			Category:  category,
-			Status:    domain.SignalStatusSpotted,
-			Note:      note,
-			CreatedAt: now,
-			UpdatedAt: now,
+		var sig *domain.Signal
+
+		if trackAddAIPrompt != "" {
+			if geminiAPIKey == "" {
+				err := fmt.Errorf("GEMINI_API_KEY is required for --ai — set it as an env var or pass --gemini-key")
+				ui.RedAlert(err)
+				return err
+			}
+
+			gmClient := gemini.New(geminiAPIKey, geminiModel)
+
+			ui.SectionHeader(fmt.Sprintf("new signal — %s (ai)", id))
+			fmt.Println(ui.DimStyle().Render("  calling Gemini…"))
+
+			sig, err = gmClient.ParseSignalFromPrompt(cmd.Context(), trackAddAIPrompt)
+			if err != nil {
+				ui.RedAlert(err)
+				return err
+			}
+		} else {
+			ui.SectionHeader(fmt.Sprintf("new signal — %s", id))
+
+			r := bufio.NewReader(os.Stdin)
+
+			title := prompt(r, "Title")
+			if title == "" {
+				return fmt.Errorf("title is required")
+			}
+
+			url := prompt(r, "URL")
+			source := prompt(r, "Source (e.g. Blog post, Twitter/X, Colleague)")
+			if source == "" {
+				source = "Unknown"
+			}
+
+			category := promptChoice(r, "Category", domain.ValidSignalCategories, "other")
+			note := prompt(r, "Why captured (1-3 sentences)")
+
+			sig = &domain.Signal{
+				Title:    title,
+				URL:      url,
+				Source:   source,
+				Category: category,
+				Note:     note,
+			}
 		}
+
+		sig.ID = id
+		sig.Date = now.Format("2006-01-02")
+		sig.Status = domain.SignalStatusSpotted
+		sig.CreatedAt = now
+		sig.UpdatedAt = now
 
 		if err := store.Save(cmd.Context(), sig); err != nil {
 			ui.RedAlert(err)
@@ -77,11 +103,19 @@ Example:
 		fmt.Println()
 		ui.Field("ID", sig.ID)
 		ui.Field("Title", sig.Title)
-		ui.Field("Status", sig.Status)
+		ui.Field("Source", sig.Source)
 		ui.Field("Category", sig.Category)
+		ui.Field("Status", sig.Status)
+		if len(sig.Tags) > 0 {
+			ui.Field("Tags", strings.Join(sig.Tags, ", "))
+		}
 		ui.Complete(fmt.Sprintf("signal %s captured", sig.ID))
 		return nil
 	},
+}
+
+func init() {
+	trackAddCmd.Flags().StringVar(&trackAddAIPrompt, "ai", "", "Describe the signal in natural language; Gemini extracts the fields")
 }
 
 // prompt reads a line from stdin with a labelled prompt.

@@ -44,7 +44,17 @@ type VideoQA interface {
 	Ask(ctx context.Context, question string, cached *CachedAnalysis) (string, error)
 }
 
-// SignalStore persists and retrieves tracked tech signals.
+// SignalEnricher uses an AI model to enrich or parse tech signals.
+type SignalEnricher interface {
+	// EnrichSignal generates AI context for an existing signal — WhatItIs,
+	// Maturity, Alternatives, StackFit, and NextSteps.
+	EnrichSignal(ctx context.Context, sig *Signal) (*SignalEnrichment, error)
+
+	// ParseSignalFromPrompt extracts a Signal from a free-text description.
+	// The caller is responsible for assigning ID, Status, and timestamps.
+	ParseSignalFromPrompt(ctx context.Context, prompt string) (*Signal, error)
+}
+
 type SignalStore interface {
 	// Save writes a signal to the backing store. Creates or overwrites by ID.
 	Save(ctx context.Context, signal *Signal) error
