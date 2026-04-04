@@ -140,6 +140,15 @@ The video must have been scanned with 'vger scan' at least once.`,
 func init() {
 	askCmd.Flags().BoolVar(&askDeep, "deep", false, "Re-submit the video to Gemini for questions beyond the cached notes")
 	askCmd.Flags().StringVar(&askLens, "lens", "", fmt.Sprintf("Apply a built-in analytical preset (%s)", lensNames()))
+
+	// Register valid lens names for shell tab-completion.
+	_ = askCmd.RegisterFlagCompletionFunc("lens", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+		names := make([]string, len(builtinLenses))
+		for i, l := range builtinLenses {
+			names[i] = l.Name + "\t" + l.ShortDesc
+		}
+		return names, cobra.ShellCompDirectiveNoFileComp
+	})
 }
 
 

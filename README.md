@@ -567,6 +567,45 @@ These flags apply to all commands:
 
 ---
 
+## SHELL COMPLETION
+
+V'GER supports tab-completion for all commands and flags in Fish, Bash, Zsh, and PowerShell.
+
+**Fish (recommended)**
+
+```fish
+vger completion fish > ~/.config/fish/completions/vger.fish
+```
+
+Fish loads completions from that directory automatically — no `config.fish` edit needed. Completions are active immediately (or after `source ~/.config/fish/completions/vger.fish`).
+
+**Bash**
+
+```bash
+vger completion bash > /etc/bash_completion.d/vger
+# or for the current session only:
+source <(vger completion bash)
+```
+
+**Zsh**
+
+```zsh
+vger completion zsh > "${fpath[1]}/_vger"
+```
+
+**PowerShell**
+
+```powershell
+vger completion powershell | Out-String | Invoke-Expression
+```
+
+**What gets completed:**
+- All subcommands (`scan`, `ask`, `digest`, `completion`, …)
+- All flag names for each command
+- `--lens` flag values: `architect`, `engineer`, `radar`, `brief` (with descriptions)
+
+---
+
 ## ARCHITECTURE
 
 V'Ger uses an **onion (ports-and-adapters) architecture**:

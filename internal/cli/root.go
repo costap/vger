@@ -19,6 +19,11 @@ var Root = &cobra.Command{
 	Long: `V'Ger ingests online conference videos (KubeCon, CloudNativeCon, etc.)
 and produces structured summaries with technology learning recommendations.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Skip setup and banner for completion subcommands — their output goes to
+		// stdout and must not be contaminated with any extra text.
+		if cmd.HasParent() && cmd.Parent().Name() == "completion" {
+			return
+		}
 		// Resolve keys: explicit flag > env var (populated by godotenv in main).
 		if geminiAPIKey == "" {
 			geminiAPIKey = os.Getenv("GEMINI_API_KEY")
