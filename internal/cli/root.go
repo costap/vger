@@ -3,6 +3,7 @@ package cli
 import (
 	"os"
 
+	"github.com/costap/vger/internal/cli/track"
 	"github.com/costap/vger/internal/cli/ui"
 	"github.com/spf13/cobra"
 )
@@ -38,4 +39,6 @@ func init() {
 	Root.AddCommand(listCmd)
 	Root.AddCommand(askCmd)
 	Root.AddCommand(digestCmd)
+	Root.AddCommand(track.Cmd())
 }
+

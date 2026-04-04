@@ -36,6 +36,7 @@ cloud-native knowledge, and returns it to you in a form you can act on.
 - Cache all analysis locally so follow-up questions are instant and free
 - Answer follow-up questions from cached context — or re-submit the video for deep analysis
 - Generate playlist digests: technology radar across all talks, AI-synthesised learning paths
+- **Track technology signals** as you discover them — capture, AI-enrich, and synthesise your backlog into actionable digests; optionally backed by a git repo for version-controlled signal history
 
 ---
 
@@ -303,6 +304,119 @@ vger digest --playlist <playlist-id-or-url> --ai --output kubecon2024.md
 
 ---
 
+### `vger track` — Technology signal tracking
+
+Capture, manage, and review technologies and ideas you encounter day-to-day.
+Signals accumulate in a personal backlog; Gemini enriches them on demand and
+synthesises your backlog into an actionable digest.
+
+**Storage adapts automatically:**
+
+| Condition | Store |
+|-----------|-------|
+| `TECHDR_DIR` env set, or `~/code/github.com/costap/tech-signals` exists | Markdown files + git auto-commit (compatible with [tech-signals](https://github.com/costap/tech-signals)) |
+| Default | JSON files at `~/.vger/signals/` |
+
+#### `track add` — Capture a new signal
+
+```bash
+# Interactive — prompts for title, URL, source, category, note
+vger track add
+
+# AI-assisted — describe it in natural language; Gemini extracts the fields
+vger track add --ai "saw a KubeCon talk on HolmesGPT for AI-driven k8s remediation https://..."
+
+# AI-assisted + open $EDITOR for review (default when TECHDR_DIR is set)
+vger track add --ai "..." --edit
+```
+
+| Flag | Description |
+|------|-------------|
+| `--ai <text>` | Free-text description; Gemini extracts all signal fields |
+| `--edit` | Open `$VISUAL`/`$EDITOR` after capture for manual review |
+
+#### `track list` — Browse your backlog
+
+```bash
+vger track list
+vger track list --status spotted
+vger track list --status evaluating --category security
+```
+
+| Flag | Description |
+|------|-------------|
+| `--status` | Filter by status: `spotted` \| `evaluating` \| `adopted` \| `rejected` \| `parked` |
+| `--category` | Filter by category: `platform` \| `networking` \| `security` \| `observability` \| `developer-experience` \| `ai-ml` \| `data` \| `other` |
+
+#### `track show` — View a signal in detail
+
+```bash
+vger track show 0001
+```
+
+Displays all fields including any AI enrichment (what it is, maturity, alternatives, stack fit, next steps).
+
+#### `track enrich` — AI-enrich a signal
+
+```bash
+vger track enrich 0001
+```
+
+Calls Gemini to fill in: **What it is**, **Maturity & Risk**, **Alternatives**, **How it could fit your stack**, **Suggested next steps**.
+Enrichment is stored alongside the signal and shown by `track show`.
+
+#### `track status` — Update investigation status
+
+```bash
+vger track status 0001 evaluating
+vger track status 0001 adopted
+```
+
+Valid progression: `spotted` → `evaluating` → `adopted` | `rejected` | `parked`
+
+When using the Markdown store, produces a `status: 0001 old → new` git commit.
+
+#### `track link` — Link a signal to a conference talk scan
+
+```bash
+vger track link 0001 --video https://www.youtube.com/watch?v=abc123
+```
+
+Records the video ID on the signal so you can cross-reference `vger scan` results.
+
+| Flag | Description |
+|------|-------------|
+| `--video <url>` | YouTube URL or video ID to associate with this signal |
+
+#### `track digest` — AI synthesis of your backlog
+
+Synthesises your signal backlog into a structured report: focus areas, technology clusters, and a pulse reading on your radar.
+
+```bash
+# Full backlog digest
+vger track digest
+
+# Digest only spotted signals, enrich any that haven't been enriched yet
+vger track digest --status spotted --enrich
+
+# Export a Markdown report
+vger track digest --output ~/tech-review-2026-04.md
+
+# Filter by category
+vger track digest --category security
+```
+
+| Flag | Description |
+|------|-------------|
+| `--status` | Only digest signals with this status |
+| `--category` | Only digest signals in this category |
+| `--enrich` | AI-enrich unenriched signals before synthesising |
+| `--output` | Write Markdown report to this file path |
+
+> Requires `GEMINI_API_KEY`. Uses [Genkit](https://github.com/firebase/genkit) for typed structured output.
+
+---
+
 ## TYPICAL WORKFLOW
 
 ### Single video
@@ -348,6 +462,47 @@ vger ask https://www.youtube.com/watch?v=TALK_ID \
 
 ---
 
+### Tech signal tracking
+
+Capture technologies as you encounter them — blog posts, talks, colleague recommendations.
+Enrich them later and synthesise your backlog when it's time to prioritise.
+
+```bash
+# 1. Quick capture from a tweet or article (AI extracts the fields)
+vger track add --ai "read a blog post about HolmesGPT for AI-driven k8s remediation https://..."
+
+# 2. Browse your backlog
+vger track list --status spotted
+
+# 3. Review a signal in detail
+vger track show 0001
+
+# 4. AI-enrich it with context, alternatives, and stack fit
+vger track enrich 0001
+
+# 5. Link it to a conference talk you scanned
+vger track link 0001 --video https://www.youtube.com/watch?v=abc123
+
+# 6. Update investigation status as you make progress
+vger track status 0001 evaluating
+
+# 7. Synthesise your backlog into an actionable digest
+vger track digest --status spotted --enrich --output ~/tech-review.md
+```
+
+**With tech-signals git repo** (set `TECHDR_DIR` or place repo at `~/code/github.com/costap/tech-signals`):
+every add, enrich, status change, and link is automatically git-committed with a structured message —
+giving you a full audit trail of your technology evaluation history.
+
+```bash
+export TECHDR_DIR=~/code/github.com/costap/tech-signals
+vger track add --ai "eBPF replacing sidecars in Cilium 1.15..."
+# → creates signals/2026/0002-2026-04-04-ebpf-sidecarless.md
+# → git commit: "signal: 0002 eBPF replacing sidecars in Cilium 1.15"
+```
+
+---
+
 ## CACHE
 
 Analysis results are stored in `~/.vger/cache/<video-id>.json`.
@@ -385,8 +540,10 @@ internal/
   agent/           — analysis pipeline orchestration
   adapters/
     youtube/       — YouTube Data API v3 client
-    gemini/        — Gemini multimodal analyser and Q&A
+    gemini/        — Gemini multimodal analyser, Q&A, and signal AI (enrich/add)
+    genkit/        — Genkit flows for typed structured output (track digest)
     cache/         — local JSON file cache (~/.vger/cache/)
+    signals/       — signal store adapters: JSONStore + MarkdownStore (tech-signals)
   cli/             — Cobra commands with LCARS terminal styling
 docs/              — architecture options, dataflow diagrams, technical spec
 ```
@@ -438,6 +595,7 @@ The built-in `GITHUB_TOKEN` is used automatically for creating the release itsel
 | 1262.4 | V'Ger bootstrap — project initialised |
 | 1262.5 | YouTube Data API and Gemini multimodal integration |
 | 1262.6 | Channel listing, analysis caching, follow-up Q&A |
+| 1262.7 | `vger track` — technology signal tracking with AI enrichment, Genkit digest, and Markdown/git store integration |
 
 ---
 

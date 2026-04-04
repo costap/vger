@@ -82,3 +82,84 @@ type DigestReport struct {
 	KeyInsights      string         // freeform narrative of the most important takeaways
 }
 
+// ── Track ─────────────────────────────────────────────────────────────────────
+
+// Valid signal status values.
+const (
+	SignalStatusSpotted    = "spotted"
+	SignalStatusEvaluating = "evaluating"
+	SignalStatusAdopted    = "adopted"
+	SignalStatusRejected   = "rejected"
+	SignalStatusParked     = "parked"
+)
+
+// ValidSignalStatuses is the ordered list of allowed status values.
+var ValidSignalStatuses = []string{
+	SignalStatusSpotted,
+	SignalStatusEvaluating,
+	SignalStatusAdopted,
+	SignalStatusRejected,
+	SignalStatusParked,
+}
+
+// ValidSignalCategories is the ordered list of allowed category values.
+var ValidSignalCategories = []string{
+	"networking", "security", "platform", "data", "ai",
+	"observability", "developer-experience", "process", "other",
+}
+
+// Signal is a technology or idea captured by the architect for later investigation.
+type Signal struct {
+	ID             string           `json:"id"`
+	Title          string           `json:"title"`
+	Date           string           `json:"date"`            // YYYY-MM-DD
+	Source         string           `json:"source"`          // "Blog post", "Twitter/X", "Colleague", …
+	URL            string           `json:"url"`
+	Category       string           `json:"category"`
+	Status         string           `json:"status"`
+	Note           string           `json:"note"`            // why captured
+	Tags           []string         `json:"tags,omitempty"`
+	LinkedVideoIDs []string         `json:"linked_video_ids,omitempty"`
+	Enrichment     *SignalEnrichment `json:"enrichment,omitempty"`
+	CreatedAt      time.Time        `json:"created_at"`
+	UpdatedAt      time.Time        `json:"updated_at"`
+}
+
+// SignalEnrichment is the AI-generated context added after initial capture.
+type SignalEnrichment struct {
+	EnrichedAt   time.Time `json:"enriched_at"`
+	WhatItIs     string    `json:"what_it_is"`
+	Maturity     string    `json:"maturity"`
+	Alternatives []string  `json:"alternatives"`
+	StackFit     string    `json:"stack_fit"`
+	NextSteps    []string  `json:"next_steps"`
+}
+
+// SignalPulse is a breakdown of signals by status and category.
+type SignalPulse struct {
+	ByStatus   map[string]int `json:"by_status"`
+	ByCategory map[string]int `json:"by_category"`
+}
+
+// FocusItem is a signal recommended for investigation this week.
+type FocusItem struct {
+	SignalID string `json:"signal_id"  jsonschema:"description=The ID of the signal to investigate"`
+	Title    string `json:"title"      jsonschema:"description=Short title of the signal"`
+	URL      string `json:"url"        jsonschema:"description=Primary URL for the signal"`
+	Reason   string `json:"reason"     jsonschema:"description=Why this signal is recommended now (1-2 sentences)"`
+}
+
+// TechCluster is a group of related signals sharing a common technology theme.
+type TechCluster struct {
+	Theme     string   `json:"theme"      jsonschema:"description=Name of the technology theme (e.g. eBPF-based networking)"`
+	SignalIDs []string `json:"signal_ids" jsonschema:"description=IDs of signals in this cluster"`
+	Summary   string   `json:"summary"    jsonschema:"description=1-2 sentence description of the common thread"`
+}
+
+// SignalDigestReport is the structured output of the vger track digest pipeline.
+type SignalDigestReport struct {
+	WeeklyFocus  []FocusItem   `json:"weekly_focus"  jsonschema:"description=Top 3 signals to investigate this week"`
+	Clusters     []TechCluster `json:"clusters"      jsonschema:"description=Related signals grouped by technology theme"`
+	LearningPath []string      `json:"learning_path" jsonschema:"description=Suggested investigation order (signal titles or tech names)"`
+	KeyInsights  string        `json:"key_insights"  jsonschema:"description=Narrative summary of patterns and trends across the backlog"`
+}
