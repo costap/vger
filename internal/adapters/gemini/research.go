@@ -86,7 +86,14 @@ type investPathJSON struct {
 }
 
 // ResearchSynthesize sends all gathered research context to Gemini and returns a
-// structured ResearchReport. It uses a single GenerateContent call (no tool loop).
+// structured ResearchReport.
+//
+// When maxDepth is 0, a single GenerateContent call is made (Phase 1 behaviour).
+// When maxDepth > 0, an investigation phase runs first: Gemini uses ask_video,
+// search_cache, and lookup_cncf_project tools to deepen its understanding, producing
+// a text transcript that is appended to the synthesis prompt (Phase 2 / Option B).
+//
+// cacheSearcher is required when maxDepth > 0 and may be nil otherwise.
 func (c *Client) ResearchSynthesize(
 	ctx context.Context,
 	topic string,
@@ -95,6 +102,8 @@ func (c *Client) ResearchSynthesize(
 	signals []*domain.Signal,
 	talks []domain.VideoListing,
 	lens *LensContext,
+	maxDepth int,
+	cacheSearcher domain.CacheSearcher,
 ) (*domain.ResearchReport, error) {
 	gc, err := genai.NewClient(ctx, &genai.ClientConfig{
 		APIKey:  c.APIKey,
@@ -110,6 +119,18 @@ func (c *Client) ResearchSynthesize(
 	}
 
 	prompt := buildResearchPrompt(topic, hits, projects, signals, talks)
+
+	// Phase 2: run investigation loop before synthesis.
+	if maxDepth > 0 {
+		transcript, err := c.runInvestigation(ctx, gc, topic, hits, cacheSearcher, maxDepth)
+		if err != nil {
+			// Investigation failure is non-fatal; fall back to Phase 1 synthesis.
+			transcript = fmt.Sprintf("(investigation failed: %s)", err.Error())
+		}
+		if transcript != "" {
+			prompt += "\n\nINVESTIGATION TRANSCRIPT (Gemini deep-dive findings):\n" + transcript
+		}
+	}
 
 	resp, err := gc.Models.GenerateContent(ctx, c.Model,
 		genai.Text(prompt),
@@ -131,6 +152,105 @@ func (c *Client) ResearchSynthesize(
 	}
 
 	return toResearchReport(topic, r, talks), nil
+}
+
+// investigationSystemPrompt instructs Gemini on how to use research tools.
+const investigationSystemPrompt = `You are V'Ger, a cloud-native technology intelligence system in investigation mode.
+Your goal is to build a comprehensive understanding of a technology topic using the tools available to you.
+
+You have access to:
+- ask_video(video_id, question): ask a specific question about a cached conference talk
+- search_cache(query): discover additional cached talks related to a search term
+- lookup_cncf_project(name): get the current CNCF graduation stage of a project
+
+Strategy:
+1. Use search_cache to find talks you may not have been given
+2. Use ask_video to get deeper detail from the most relevant talks
+3. Use lookup_cncf_project to verify project maturity claims
+
+When you have gathered sufficient evidence, write a comprehensive investigation summary as plain text (not JSON). Cover:
+- What the technology is, why it matters now, and key adoption signals from the talks
+- Real-world patterns, trade-offs, and implementation challenges mentioned
+- Related CNCF projects and their current maturity
+- Open questions or gaps that the synthesis should address`
+
+// runInvestigation runs a tool-enabled multi-turn investigation loop and returns
+// a plain-text transcript of Gemini's findings. The transcript is intended to be
+// appended to the synthesis prompt to enrich the final JSON output.
+func (c *Client) runInvestigation(
+	ctx context.Context,
+	gc *genai.Client,
+	topic string,
+	hits []*domain.CachedAnalysis,
+	cacheSearcher domain.CacheSearcher,
+	maxDepth int,
+) (string, error) {
+	tools := newResearchToolSet(c.cncfClient, hits, cacheSearcher, c)
+
+	// Build the investigation prompt: topic + inventory of queryable videos.
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("TOPIC: %q\n\n", topic))
+	if len(hits) > 0 {
+		sb.WriteString(fmt.Sprintf("AVAILABLE CACHED TALKS (%d) — use ask_video with these IDs:\n", len(hits)))
+		for _, h := range hits {
+			sb.WriteString(fmt.Sprintf("  video_id=%q  title=%q\n", h.VideoID, h.Report.VideoTitle))
+		}
+	} else {
+		sb.WriteString("No cached talks available yet — use search_cache to discover relevant videos.\n")
+	}
+	sb.WriteString("\nInvestigate the topic using the tools above, then write your investigation summary.")
+
+	contents := []*genai.Content{
+		{
+			Role:  genai.RoleUser,
+			Parts: []*genai.Part{{Text: sb.String()}},
+		},
+	}
+
+	config := &genai.GenerateContentConfig{
+		SystemInstruction: genai.NewContentFromText(investigationSystemPrompt, genai.RoleUser),
+		Tools: []*genai.Tool{
+			{FunctionDeclarations: tools.declarations},
+		},
+	}
+
+	for round := 0; round < maxDepth; round++ {
+		resp, err := gc.Models.GenerateContent(ctx, c.Model, contents, config)
+		if err != nil {
+			return "", fmt.Errorf("investigation round %d: %w", round+1, err)
+		}
+
+		fcs := resp.FunctionCalls()
+		if len(fcs) == 0 {
+			// No more tool calls — model has written its investigation summary.
+			return strings.TrimSpace(resp.Text()), nil
+		}
+
+		if len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
+			contents = append(contents, resp.Candidates[0].Content)
+		}
+
+		toolContent := &genai.Content{Role: genai.RoleUser}
+		for _, fc := range fcs {
+			result := tools.execute(ctx, fc)
+			toolContent.Parts = append(toolContent.Parts,
+				genai.NewPartFromFunctionResponse(fc.Name, result))
+		}
+		contents = append(contents, toolContent)
+	}
+
+	// Rounds exhausted — prompt for a final summary with remaining context.
+	contents = append(contents, &genai.Content{
+		Role:  genai.RoleUser,
+		Parts: []*genai.Part{{Text: "You have reached the maximum investigation depth. Please write your investigation summary now based on what you have gathered so far."}},
+	})
+	resp, err := gc.Models.GenerateContent(ctx, c.Model, contents, &genai.GenerateContentConfig{
+		SystemInstruction: config.SystemInstruction,
+	})
+	if err != nil {
+		return "", fmt.Errorf("investigation final summary: %w", err)
+	}
+	return strings.TrimSpace(resp.Text()), nil
 }
 
 func buildResearchPrompt(

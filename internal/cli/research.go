@@ -22,6 +22,7 @@ var (
 	researchChannel   string
 	researchLens      string
 	researchMaxVideos int
+	researchMaxDepth  int
 	researchOutput    string
 )
 
@@ -31,10 +32,7 @@ type signalSearcher interface {
 	Search(ctx context.Context, query string) ([]*domain.Signal, error)
 }
 
-var researchCmd = &cobra.Command{
-	Use:   "research <topic>",
-	Short: "Search all sources about a topic and synthesise investigation paths",
-	Long: `Research a technology topic by searching all available sources:
+var researchLongDesc = `Research a technology topic by searching all available sources:
   • Local cache of previously scanned conference talks
   • CNCF landscape for related projects
   • Your tracked technology signals
@@ -46,13 +44,26 @@ a landscape map, evidence from cached videos, investigation paths, and a verdict
 Use --lens to apply an analytical preset to the synthesis (architect, engineer,
 radar, brief). Use --discover to also search YouTube for unscanned relevant talks.
 
+Use --max-depth to enable Phase 2 investigation: Gemini will autonomously query
+cached videos and search for additional evidence before synthesising the report.
+  --max-depth 0  fast single-pass synthesis (default)
+  --max-depth 3  light investigation (3 tool rounds)
+  --max-depth 5  standard investigation (recommended)
+  --max-depth 8  deep investigation (broader topics, higher cost)
+
 Examples:
   vger research "eBPF"
   vger research "multi-cluster networking" --discover
   vger research "WASM in Kubernetes" --lens architect
-  vger research "service mesh" --output service-mesh-brief.md`,
-	Args: cobra.ExactArgs(1),
-	RunE: runResearch,
+  vger research "service mesh" --max-depth 5
+  vger research "service mesh" --output service-mesh-brief.md`
+
+var researchCmd = &cobra.Command{
+	Use:   "research <topic>",
+	Short: "Search all sources about a topic and synthesise investigation paths",
+	Long:  researchLongDesc,
+	Args:  cobra.ExactArgs(1),
+	RunE:  runResearch,
 }
 
 func runResearch(cmd *cobra.Command, args []string) error {
@@ -124,7 +135,11 @@ func runResearch(cmd *cobra.Command, args []string) error {
 	}
 
 	// --- Phase 5: Gemini synthesis ---
-	ui.Status("Synthesising research brief…")
+	if researchMaxDepth > 0 {
+		ui.Status(fmt.Sprintf("Running deep investigation (max depth %d)…", researchMaxDepth))
+	} else {
+		ui.Status("Synthesising research brief…")
+	}
 
 	var lc *gemini.LensContext
 	if researchLens != "" {
@@ -135,7 +150,7 @@ func runResearch(cmd *cobra.Command, args []string) error {
 		lc = &gemini.LensContext{RoleContext: lens.RoleContext}
 	}
 
-	report, err := gmClient.ResearchSynthesize(ctx, topic, hits, projects, matchedSignals, discoveredTalks, lc)
+	report, err := gmClient.ResearchSynthesize(ctx, topic, hits, projects, matchedSignals, discoveredTalks, lc, researchMaxDepth, cacheClient)
 	if err != nil {
 		ui.RedAlert(err)
 		return err
@@ -191,6 +206,7 @@ func init() {
 	researchCmd.Flags().StringVar(&researchChannel, "channel", "@cncf", "YouTube channel to search when --discover is used")
 	researchCmd.Flags().StringVar(&researchLens, "lens", "", fmt.Sprintf("Apply a built-in analytical lens (%s)", lensNames()))
 	researchCmd.Flags().IntVar(&researchMaxVideos, "max-videos", 10, "Maximum cached videos to include in context")
+	researchCmd.Flags().IntVar(&researchMaxDepth, "max-depth", 0, "Investigation depth: 0=fast single-pass, 3=light, 5=standard, 8=deep (Phase 2)")
 	researchCmd.Flags().StringVar(&researchOutput, "output", "", "Write report to a Markdown file")
 
 	_ = researchCmd.RegisterFlagCompletionFunc("lens", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
