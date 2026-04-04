@@ -42,7 +42,7 @@ Prompt       →  track add      →                → track digest  →
 | T1-2 | `vger ask --all` — question across full cache | [ask](epic-ask.md) | M |
 | T1-3 | `vger digest --diff <playlist-a> <playlist-b>` | [digest](epic-digest.md) | M |
 | T1-4 | `vger watch --playlist <id>` — auto-scan daemon | [new commands](epic-new-commands.md) | M |
-| T1-5 | `vger research` Phase 2 — LLM-directed deep-dives | [research](epic-research.md) | M |
+| T1-5 | `vger research` Phase 2 — LLM-directed deep-dives ✅ | [research](epic-research.md) | M |
 | T1-6 | `vger track search <query>` as first-class command | [track](epic-track.md) | S |
 
 ---

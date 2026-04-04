@@ -2,15 +2,16 @@
 
 Covers improvements to the research command, which synthesises insights across all local sources and optionally the web.
 
-> **Current state (v0.7):** Phase 1 implemented — structured pipeline with one Gemini synthesis call.  
-> Cache search → CNCF lookup → signal search → (optional) YouTube discover → Gemini synthesis.
+> **Current state (v0.8):** Phase 1 and Phase 2 implemented.
+> - Phase 1 (`--max-depth 0`, default): single Gemini synthesis call with `ResponseMIMEType: application/json`
+> - Phase 2 (`--max-depth N`): tool-enabled investigation loop before synthesis — Gemini autonomously calls `ask_video`, `search_cache`, `lookup_cncf_project` to deepen its research, producing a text transcript that is appended to the synthesis prompt.
 
 ---
 
 ## Stories
 
-### T1-5 · Phase 2 — LLM-directed deep-dives with tools
-**Priority:** Tier 1 · Effort: M
+### T1-5 · Phase 2 — LLM-directed deep-dives with tools ✅ Implemented
+**Priority:** Tier 1 · Effort: M · **Status: Done (v0.8)**
 
 **As a** user researching a topic,  
 **I want** Gemini to autonomously decide which videos to read in full and which CNCF projects to look up,  
@@ -24,12 +25,12 @@ Covers improvements to the research command, which synthesises insights across a
 - Final synthesis uses same `ResearchReport` domain type — fully backward compatible
 - `--max-depth <n>` flag controls iteration budget
 
-**Design reference:** See Phase 2 section in `docs/roadmap/` plan notes and `plan.md`.
-
-**Implementation notes:**
-- `internal/adapters/gemini/research.go` — add tool declarations (`ask_video`, `lookup_cncf`, `search_cache`) and multi-turn loop before final synthesis call
-- All domain types, CLI flags, UI rendering unchanged
-- `gemini.NewWithTools()` already used; tools just need registering for the research call
+**Implementation (Option B — two-phase):**
+- `internal/adapters/gemini/research_tools.go` — `researchToolSet` with `ask_video` (calls `c.Ask()`, text context only), `search_cache` (calls `cache.Search()`), `lookup_cncf_project`, `validate_url`
+- `internal/adapters/gemini/research.go` — `runInvestigation()` multi-turn tool loop returning plain-text transcript; `ResearchSynthesize()` accepts `maxDepth int` + `cacheSearcher` — appends transcript to synthesis prompt when `maxDepth > 0`
+- `internal/cli/research.go` — `--max-depth` flag (default 0 = Phase 1, 5 = recommended Phase 2)
+- Investigation failure is non-fatal; falls back to Phase 1 synthesis
+- JSON reliability preserved: synthesis call always uses `ResponseMIMEType: application/json` regardless of depth
 
 ---
 
