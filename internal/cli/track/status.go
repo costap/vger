@@ -1,4 +1,4 @@
-package cli
+package track
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var trackStatusCmd = &cobra.Command{
+var statusCmd = &cobra.Command{
 	Use:   "status <id> <new-status>",
 	Short: "Update the status of a signal",
 	Long: `Update the investigation status of a tracked signal.

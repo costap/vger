@@ -1,4 +1,4 @@
-package cli
+package track
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var trackEnrichCmd = &cobra.Command{
+var enrichCmd = &cobra.Command{
 	Use:   "enrich <id>",
 	Short: "AI-enrich a signal with context, alternatives, and next steps",
 	Long: `Call Gemini to analyse a captured signal and fill the AI enrichment section.
@@ -23,7 +23,8 @@ Example:
   vger track enrich 0001`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if geminiAPIKey == "" {
+		key := geminiKey(cmd)
+		if key == "" {
 			err := fmt.Errorf("GEMINI_API_KEY is required — set it as an env var or pass --gemini-key")
 			ui.RedAlert(err)
 			return err
@@ -48,7 +49,7 @@ Example:
 			return err
 		}
 
-		gmClient := gemini.New(geminiAPIKey, geminiModel)
+		gmClient := gemini.New(key, model(cmd))
 
 		ui.Field("Enriching", sig.ID+" — "+sig.Title)
 		fmt.Println(ui.DimStyle().Render("  calling Gemini…"))

@@ -1,4 +1,4 @@
-package cli
+package track
 
 import (
 	"fmt"
@@ -10,10 +10,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var trackListStatus   string
-var trackListCategory string
+var listStatus   string
+var listCategory string
 
-var trackListCmd = &cobra.Command{
+var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List tracked signals",
 	Long: `List all captured technology signals.
@@ -34,25 +34,25 @@ Examples:
 		var sigs []*domain.Signal
 
 		switch {
-		case trackListStatus != "" && trackListCategory != "":
-			all, err := store.LoadByStatus(cmd.Context(), trackListStatus)
+		case listStatus != "" && listCategory != "":
+			all, err := store.LoadByStatus(cmd.Context(), listStatus)
 			if err != nil {
 				ui.RedAlert(err)
 				return err
 			}
 			for _, s := range all {
-				if s.Category == trackListCategory {
+				if s.Category == listCategory {
 					sigs = append(sigs, s)
 				}
 			}
-		case trackListStatus != "":
-			sigs, err = store.LoadByStatus(cmd.Context(), trackListStatus)
+		case listStatus != "":
+			sigs, err = store.LoadByStatus(cmd.Context(), listStatus)
 			if err != nil {
 				ui.RedAlert(err)
 				return err
 			}
-		case trackListCategory != "":
-			sigs, err = store.LoadByCategory(cmd.Context(), trackListCategory)
+		case listCategory != "":
+			sigs, err = store.LoadByCategory(cmd.Context(), listCategory)
 			if err != nil {
 				ui.RedAlert(err)
 				return err
@@ -71,18 +71,17 @@ Examples:
 		}
 
 		title := "signals"
-		if trackListStatus != "" {
-			title += " — " + trackListStatus
+		if listStatus != "" {
+			title += " — " + listStatus
 		}
-		if trackListCategory != "" {
-			title += " — " + trackListCategory
+		if listCategory != "" {
+			title += " — " + listCategory
 		}
 		ui.SectionHeader(fmt.Sprintf("%s (%d)", title, len(sigs)))
 
 		labelSty := ui.LabelStyle()
 		dimSty := ui.DimStyle()
 
-		// Header row
 		fmt.Printf("  %s  %s  %s  %s  %s\n",
 			labelSty.Render(fmt.Sprintf("%-6s", "ID")),
 			dimSty.Render(fmt.Sprintf("%-12s", "DATE")),
@@ -101,8 +100,8 @@ Examples:
 				labelSty.Render(fmt.Sprintf("%-6s", s.ID)),
 				dimSty.Render(fmt.Sprintf("%-12s", s.Date)),
 				signalStatusStyle(s.Status).Render(fmt.Sprintf("%-11s", s.Status)),
-				dimSty.Render(fmt.Sprintf("%-22s", truncateSignal(s.Category, 22))),
-				labelSty.Render(truncateSignal(s.Title, 50)),
+				dimSty.Render(fmt.Sprintf("%-22s", truncate(s.Category, 22))),
+				labelSty.Render(truncate(s.Title, 50)),
 				dimSty.Render(enriched),
 			)
 		}
@@ -112,11 +111,11 @@ Examples:
 }
 
 func init() {
-	trackListCmd.Flags().StringVar(&trackListStatus, "status", "", "Filter by status (spotted|evaluating|adopted|rejected|parked)")
-	trackListCmd.Flags().StringVar(&trackListCategory, "category", "", "Filter by category")
+	listCmd.Flags().StringVar(&listStatus, "status", "", "Filter by status (spotted|evaluating|adopted|rejected|parked)")
+	listCmd.Flags().StringVar(&listCategory, "category", "", "Filter by category")
 }
 
-func truncateSignal(s string, n int) string {
+func truncate(s string, n int) string {
 	if len(s) <= n {
 		return s
 	}

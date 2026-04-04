@@ -1,4 +1,4 @@
-package cli
+package track
 
 import (
 	"fmt"
@@ -10,9 +10,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var trackLinkVideo string
+var linkVideo string
 
-var trackLinkCmd = &cobra.Command{
+var linkCmd = &cobra.Command{
 	Use:   "link <id> --video <youtube-url>",
 	Short: "Link a signal to a vger video scan",
 	Long: `Associate a tracked signal with a previously scanned conference talk.
@@ -26,21 +26,19 @@ Examples:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		id := fmt.Sprintf("%04s", args[0])
 
-		if trackLinkVideo == "" {
+		if linkVideo == "" {
 			err := fmt.Errorf("--video is required")
 			ui.RedAlert(err)
 			return err
 		}
 
-		// Resolve video ID from URL or raw ID.
-		videoID := extractVideoID(trackLinkVideo)
+		videoID := extractVideoID(linkVideo)
 		if videoID == "" {
-			err := fmt.Errorf("could not extract video ID from: %s", trackLinkVideo)
+			err := fmt.Errorf("could not extract video ID from: %s", linkVideo)
 			ui.RedAlert(err)
 			return err
 		}
 
-		// Verify the video is in the cache.
 		cacheDir, err := cache.DefaultDir()
 		if err != nil {
 			ui.RedAlert(err)
@@ -53,12 +51,11 @@ Examples:
 			return err
 		}
 		if entry == nil {
-			err := fmt.Errorf("video %s is not in the vger cache — run: vger scan %s", videoID, trackLinkVideo)
+			err := fmt.Errorf("video %s is not in the vger cache — run: vger scan %s", videoID, linkVideo)
 			ui.RedAlert(err)
 			return err
 		}
 
-		// Load the signal.
 		store, err := resolveSignalStore()
 		if err != nil {
 			ui.RedAlert(err)
@@ -76,7 +73,6 @@ Examples:
 			return err
 		}
 
-		// Check for duplicate.
 		for _, existing := range sig.LinkedVideoIDs {
 			if existing == videoID {
 				ui.Complete(fmt.Sprintf("video %s already linked to signal %s", videoID, id))
@@ -101,13 +97,12 @@ Examples:
 }
 
 func init() {
-	trackLinkCmd.Flags().StringVar(&trackLinkVideo, "video", "", "YouTube URL or video ID to link")
+	linkCmd.Flags().StringVar(&linkVideo, "video", "", "YouTube URL or video ID to link")
 }
 
 // extractVideoID pulls the video ID from a YouTube URL or returns the raw string
 // if it looks like a bare video ID (11 characters).
 func extractVideoID(input string) string {
-	// Try URL parsing first (handles v= parameter).
 	if strings.Contains(input, "youtube.com") || strings.Contains(input, "youtu.be") {
 		for _, part := range strings.Split(input, "?") {
 			for _, kv := range strings.Split(part, "&") {
@@ -116,7 +111,6 @@ func extractVideoID(input string) string {
 				}
 			}
 		}
-		// youtu.be/<id>
 		if strings.Contains(input, "youtu.be/") {
 			parts := strings.Split(input, "youtu.be/")
 			if len(parts) == 2 {
@@ -124,7 +118,6 @@ func extractVideoID(input string) string {
 			}
 		}
 	}
-	// Bare video ID (YouTube IDs are 11 chars).
 	if len(input) == 11 && !strings.Contains(input, "/") {
 		return input
 	}

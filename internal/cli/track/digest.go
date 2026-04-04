@@ -1,4 +1,4 @@
-package cli
+package track
 
 import (
 	"fmt"
@@ -14,13 +14,13 @@ import (
 )
 
 var (
-	trackDigestStatus   string
-	trackDigestCategory string
-	trackDigestEnrich   bool
-	trackDigestOutput   string
+	digestStatus   string
+	digestCategory string
+	digestEnrich   bool
+	digestOutput   string
 )
 
-var trackDigestCmd = &cobra.Command{
+var digestCmd = &cobra.Command{
 	Use:   "digest",
 	Short: "AI-powered synthesis of your signal backlog",
 	Long: `Synthesise your tracked signals into a prioritised backlog review.
@@ -39,7 +39,8 @@ Examples:
   vger track digest --status spotted --enrich
   vger track digest --output ~/tech-review.md`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if geminiAPIKey == "" {
+		key := geminiKey(cmd)
+		if key == "" {
 			err := fmt.Errorf("GEMINI_API_KEY is required — set it as an env var or pass --gemini-key")
 			ui.RedAlert(err)
 			return err
@@ -51,13 +52,12 @@ Examples:
 			return err
 		}
 
-		// Load signals (filtered if flags set).
 		var sigs []*domain.Signal
 		switch {
-		case trackDigestStatus != "":
-			sigs, err = store.LoadByStatus(cmd.Context(), trackDigestStatus)
-		case trackDigestCategory != "":
-			sigs, err = store.LoadByCategory(cmd.Context(), trackDigestCategory)
+		case digestStatus != "":
+			sigs, err = store.LoadByStatus(cmd.Context(), digestStatus)
+		case digestCategory != "":
+			sigs, err = store.LoadByCategory(cmd.Context(), digestCategory)
 		default:
 			sigs, err = store.LoadAll(cmd.Context())
 		}
@@ -73,9 +73,8 @@ Examples:
 
 		ui.SectionHeader(fmt.Sprintf("track digest — %d signals", len(sigs)))
 
-		// Optional: enrich unenriched signals.
-		if trackDigestEnrich {
-			gmClient := gemini.New(geminiAPIKey, geminiModel)
+		if digestEnrich {
+			gmClient := gemini.New(key, model(cmd))
 			enriched := 0
 			for _, sig := range sigs {
 				if sig.Enrichment != nil {
@@ -100,10 +99,8 @@ Examples:
 			}
 		}
 
-		// Build pulse stats.
 		pulse := buildPulse(sigs)
 
-		// Dereference slice of pointers to slice of values for Genkit input.
 		flatSigs := make([]domain.Signal, len(sigs))
 		for i, s := range sigs {
 			flatSigs[i] = *s
@@ -111,7 +108,7 @@ Examples:
 
 		fmt.Println(ui.DimStyle().Render("  calling Gemini via Genkit…"))
 
-		report, err := genkitadapter.DigestSignals(cmd.Context(), geminiAPIKey, geminiModel,
+		report, err := genkitadapter.DigestSignals(cmd.Context(), key, model(cmd),
 			genkitadapter.DigestInput{
 				Signals: flatSigs,
 				Pulse:   pulse,
@@ -122,16 +119,14 @@ Examples:
 			return err
 		}
 
-		// Render to terminal.
 		renderDigestReport(report, pulse, len(sigs))
 
-		// Optionally write Markdown file.
-		if trackDigestOutput != "" {
-			if err := writeDigestMarkdown(report, pulse, sigs, trackDigestOutput); err != nil {
+		if digestOutput != "" {
+			if err := writeDigestMarkdown(report, pulse, sigs, digestOutput); err != nil {
 				ui.RedAlert(fmt.Errorf("write output: %w", err))
 				return err
 			}
-			ui.Complete(fmt.Sprintf("report saved to %s", trackDigestOutput))
+			ui.Complete(fmt.Sprintf("report saved to %s", digestOutput))
 		}
 
 		return nil
@@ -139,10 +134,10 @@ Examples:
 }
 
 func init() {
-	trackDigestCmd.Flags().StringVar(&trackDigestStatus, "status", "", "Filter signals by status before digesting")
-	trackDigestCmd.Flags().StringVar(&trackDigestCategory, "category", "", "Filter signals by category before digesting")
-	trackDigestCmd.Flags().BoolVar(&trackDigestEnrich, "enrich", false, "Enrich unenriched signals with AI context before synthesis")
-	trackDigestCmd.Flags().StringVar(&trackDigestOutput, "output", "", "Write a Markdown report to this file path")
+	digestCmd.Flags().StringVar(&digestStatus, "status", "", "Filter signals by status before digesting")
+	digestCmd.Flags().StringVar(&digestCategory, "category", "", "Filter signals by category before digesting")
+	digestCmd.Flags().BoolVar(&digestEnrich, "enrich", false, "Enrich unenriched signals with AI context before synthesis")
+	digestCmd.Flags().StringVar(&digestOutput, "output", "", "Write a Markdown report to this file path")
 }
 
 func buildPulse(sigs []*domain.Signal) domain.SignalPulse {
@@ -161,7 +156,6 @@ func renderDigestReport(report *domain.SignalDigestReport, pulse domain.SignalPu
 	dimSty := ui.DimStyle()
 	labelSty := ui.LabelStyle()
 
-	// Pulse summary.
 	fmt.Println()
 	ui.SectionHeader("pulse")
 	fmt.Printf("  %s  ", labelSty.Render("TOTAL"))
@@ -175,7 +169,6 @@ func renderDigestReport(report *domain.SignalDigestReport, pulse domain.SignalPu
 	}
 	fmt.Println()
 
-	// Weekly focus.
 	if len(report.WeeklyFocus) > 0 {
 		ui.SectionHeader("weekly focus")
 		for i, f := range report.WeeklyFocus {
@@ -187,7 +180,6 @@ func renderDigestReport(report *domain.SignalDigestReport, pulse domain.SignalPu
 		}
 	}
 
-	// Clusters.
 	if len(report.Clusters) > 0 {
 		ui.SectionHeader("clusters")
 		for _, c := range report.Clusters {
@@ -197,7 +189,6 @@ func renderDigestReport(report *domain.SignalDigestReport, pulse domain.SignalPu
 		}
 	}
 
-	// Learning path.
 	if len(report.LearningPath) > 0 {
 		ui.SectionHeader("learning path")
 		for i, item := range report.LearningPath {
@@ -206,7 +197,6 @@ func renderDigestReport(report *domain.SignalDigestReport, pulse domain.SignalPu
 		fmt.Println()
 	}
 
-	// Key insights.
 	if report.KeyInsights != "" {
 		ui.SectionHeader("key insights")
 		fmt.Printf("  %s\n\n", dimSty.Render(report.KeyInsights))

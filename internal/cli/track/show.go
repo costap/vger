@@ -1,4 +1,4 @@
-package cli
+package track
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var trackShowCmd = &cobra.Command{
+var showCmd = &cobra.Command{
 	Use:   "show <id>",
 	Short: "Display a signal in detail",
 	Long: `Display the full details of a tracked signal, including any AI enrichment.
