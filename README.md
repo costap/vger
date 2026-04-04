@@ -240,6 +240,34 @@ demo details not captured in the notes), use `--deep`:
 vger ask --deep <youtube-url> "<question>"
 ```
 
+#### Analytical lenses
+
+Use `--lens` to apply a built-in analytical preset instead of typing the same
+verbose prompt every time. The question argument becomes **optional** when a lens
+is set — the lens provides a default question. You can still add a custom question
+to focus the lens on something specific.
+
+```bash
+# Use a lens (no question needed)
+vger ask --lens architect https://www.youtube.com/watch?v=H06qrNmGqyE
+
+# Lens + custom focus
+vger ask --lens architect https://www.youtube.com/watch?v=H06qrNmGqyE \
+  "focus specifically on the database connection pooling approach"
+
+# Lens + deep video re-read
+vger ask --deep --lens radar https://www.youtube.com/watch?v=H06qrNmGqyE
+```
+
+**Available lenses:**
+
+| Lens | What it produces |
+|------|-----------------|
+| `architect` | Solutions architect analysis: approach, decisions, trade-offs, novelty |
+| `engineer` | Hands-on deep-dive: implementation patterns, config details, getting started, gotchas |
+| `radar` | Tech radar recommendations: Adopt / Trial / Assess / Hold per technology |
+| `brief` | 3–5 bullet team briefing: problem, approach, takeaways, action |
+
 **Examples:**
 
 ```bash
@@ -249,6 +277,11 @@ vger ask https://www.youtube.com/watch?v=H06qrNmGqyE \
 
 vger ask https://www.youtube.com/watch?v=H06qrNmGqyE \
   "Which of the technologies mentioned are production-ready today?"
+
+# Analytical lenses — no question needed
+vger ask --lens architect https://www.youtube.com/watch?v=H06qrNmGqyE
+vger ask --lens radar     https://www.youtube.com/watch?v=H06qrNmGqyE
+vger ask --lens brief     https://www.youtube.com/watch?v=H06qrNmGqyE
 
 # Deep — Gemini re-reads the full video
 vger ask --deep https://www.youtube.com/watch?v=H06qrNmGqyE \
@@ -260,6 +293,7 @@ vger ask --deep https://www.youtube.com/watch?v=H06qrNmGqyE \
 | Flag | Description |
 |------|-------------|
 | `--deep` | Re-submit the video to Gemini for video-grounded answers |
+| `--lens <name>` | Apply a built-in analytical preset (`architect`, `engineer`, `radar`, `brief`) |
 
 > Note: `vger scan` must be run at least once before `vger ask` can be used.
 > Use `vger scan --refresh` to refresh the cache and pick up the deep notes format
@@ -432,7 +466,11 @@ vger scan https://www.youtube.com/watch?v=TALK_ID
 vger ask https://www.youtube.com/watch?v=TALK_ID \
   "Which technologies are worth prioritising for my platform team?"
 
-# 4. Dig deeper into something specific (re-reads video)
+# 4. Use an analytical lens — no question needed
+vger ask --lens architect https://www.youtube.com/watch?v=TALK_ID
+vger ask --lens radar     https://www.youtube.com/watch?v=TALK_ID
+
+# 5. Dig deeper into something specific (re-reads video)
 vger ask --deep https://www.youtube.com/watch?v=TALK_ID \
   "What did they say about multi-cluster networking?"
 ```
