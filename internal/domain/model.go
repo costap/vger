@@ -135,3 +135,31 @@ type SignalEnrichment struct {
 	NextSteps    []string  `json:"next_steps"`
 }
 
+// SignalPulse is a breakdown of signals by status and category.
+type SignalPulse struct {
+	ByStatus   map[string]int `json:"by_status"`
+	ByCategory map[string]int `json:"by_category"`
+}
+
+// FocusItem is a signal recommended for investigation this week.
+type FocusItem struct {
+	SignalID string `json:"signal_id"  jsonschema:"description=The ID of the signal to investigate"`
+	Title    string `json:"title"      jsonschema:"description=Short title of the signal"`
+	URL      string `json:"url"        jsonschema:"description=Primary URL for the signal"`
+	Reason   string `json:"reason"     jsonschema:"description=Why this signal is recommended now (1-2 sentences)"`
+}
+
+// TechCluster is a group of related signals sharing a common technology theme.
+type TechCluster struct {
+	Theme     string   `json:"theme"      jsonschema:"description=Name of the technology theme (e.g. eBPF-based networking)"`
+	SignalIDs []string `json:"signal_ids" jsonschema:"description=IDs of signals in this cluster"`
+	Summary   string   `json:"summary"    jsonschema:"description=1-2 sentence description of the common thread"`
+}
+
+// SignalDigestReport is the structured output of the vger track digest pipeline.
+type SignalDigestReport struct {
+	WeeklyFocus  []FocusItem   `json:"weekly_focus"  jsonschema:"description=Top 3 signals to investigate this week"`
+	Clusters     []TechCluster `json:"clusters"      jsonschema:"description=Related signals grouped by technology theme"`
+	LearningPath []string      `json:"learning_path" jsonschema:"description=Suggested investigation order (signal titles or tech names)"`
+	KeyInsights  string        `json:"key_insights"  jsonschema:"description=Narrative summary of patterns and trends across the backlog"`
+}

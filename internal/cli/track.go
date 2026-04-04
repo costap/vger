@@ -19,7 +19,9 @@ Examples:
   vger track show 0001                     # view a signal in detail
   vger track enrich 0001                   # AI-enrich a signal
   vger track status 0001 evaluating        # update investigation status
-  vger track link 0001 --video <url>       # link to a conference talk scan`,
+  vger track link 0001 --video <url>       # link to a conference talk scan
+  vger track digest                        # AI-powered backlog synthesis
+  vger track digest --status spotted --enrich --output ~/review.md`,
 }
 
 func init() {
@@ -29,4 +31,5 @@ func init() {
 	trackCmd.AddCommand(trackStatusCmd)
 	trackCmd.AddCommand(trackLinkCmd)
 	trackCmd.AddCommand(trackEnrichCmd)
+	trackCmd.AddCommand(trackDigestCmd)
 }
