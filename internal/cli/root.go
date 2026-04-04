@@ -19,9 +19,13 @@ var Root = &cobra.Command{
 	Long: `V'Ger ingests online conference videos (KubeCon, CloudNativeCon, etc.)
 and produces structured summaries with technology learning recommendations.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		// Skip setup and banner for completion subcommands — their output goes to
-		// stdout and must not be contaminated with any extra text.
-		if cmd.HasParent() && cmd.Parent().Name() == "completion" {
+		// Skip setup and banner for any completion-related invocation.
+		// This covers both the user-visible `vger completion fish|bash|zsh`
+		// subcommand and Cobra's internal `__complete` / `__completeNoDesc`
+		// commands that shell scripts call at runtime for live tab-completion.
+		n := cmd.Name()
+		if n == "__complete" || n == "__completeNoDesc" ||
+			(cmd.HasParent() && cmd.Parent().Name() == "completion") {
 			return
 		}
 		// Resolve keys: explicit flag > env var (populated by godotenv in main).
