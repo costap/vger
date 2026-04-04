@@ -1,16 +1,51 @@
 package cli
 
 import (
+	"fmt"
+	"os"
+
+	"github.com/costap/vger/internal/adapters/signals"
+	"github.com/costap/vger/internal/domain"
 	"github.com/spf13/cobra"
 )
+
+// resolveSignalStore returns the appropriate SignalStore implementation.
+//
+// When TECHDR_DIR is set (or the default tech-signals path exists) a
+// MarkdownStore backed by that repo is returned; otherwise the JSON store
+// at ~/.vger/signals/ is used.
+func resolveSignalStore() (domain.SignalStore, error) {
+	dir := os.Getenv("TECHDR_DIR")
+	if dir == "" {
+		home, _ := os.UserHomeDir()
+		candidate := home + "/code/github.com/costap/tech-signals"
+		if _, err := os.Stat(candidate + "/.next-id"); err == nil {
+			dir = candidate
+		}
+	}
+	if dir != "" {
+		if _, err := os.Stat(dir); err != nil {
+			return nil, fmt.Errorf("TECHDR_DIR %q does not exist: %w", dir, err)
+		}
+		return signals.NewMarkdownStore(dir), nil
+	}
+
+	// Fall back to JSON store.
+	jsonDir, err := signals.DefaultDir()
+	if err != nil {
+		return nil, fmt.Errorf("resolve signals dir: %w", err)
+	}
+	return signals.New(jsonDir), nil
+}
 
 var trackCmd = &cobra.Command{
 	Use:   "track",
 	Short: "Track and manage technology signals",
 	Long: `Capture, manage, and review technologies and ideas worth investigating.
 
-Signals are stored in ~/.vger/signals/ as JSON files and can be enriched
-with AI context and linked to vger video scans.
+Storage adapts automatically:
+  • TECHDR_DIR set / tech-signals repo detected → Markdown files + git auto-commit
+  • default                                     → JSON files at ~/.vger/signals/
 
 Examples:
   vger track add                           # interactive capture

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/costap/vger/internal/adapters/gemini"
-	"github.com/costap/vger/internal/adapters/signals"
 	"github.com/costap/vger/internal/cli/ui"
 	"github.com/spf13/cobra"
 )
@@ -32,12 +31,11 @@ Example:
 
 		id := fmt.Sprintf("%04s", args[0])
 
-		sigDir, err := signals.DefaultDir()
+		store, err := resolveSignalStore()
 		if err != nil {
 			ui.RedAlert(err)
 			return err
 		}
-		store := signals.New(sigDir)
 
 		sig, err := store.Load(cmd.Context(), id)
 		if err != nil {

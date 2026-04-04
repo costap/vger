@@ -38,12 +38,11 @@ Examples:
 			return err
 		}
 
-		sigDir, err := signals.DefaultDir()
+		store, err := resolveSignalStore()
 		if err != nil {
 			ui.RedAlert(err)
 			return err
 		}
-		store := signals.New(sigDir)
 
 		sig, err := store.Load(cmd.Context(), id)
 		if err != nil {
@@ -60,9 +59,17 @@ Examples:
 		sig.Status = newStatus
 		sig.UpdatedAt = time.Now().UTC()
 
-		if err := store.Save(cmd.Context(), sig); err != nil {
-			ui.RedAlert(err)
-			return err
+		// MarkdownStore supports a dedicated status-change commit message.
+		if ms, ok := store.(*signals.MarkdownStore); ok {
+			if err := ms.SaveStatusChange(cmd.Context(), sig, oldStatus); err != nil {
+				ui.RedAlert(err)
+				return err
+			}
+		} else {
+			if err := store.Save(cmd.Context(), sig); err != nil {
+				ui.RedAlert(err)
+				return err
+			}
 		}
 
 		ui.Field("Signal", sig.ID+" — "+sig.Title)

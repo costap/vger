@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/costap/vger/internal/adapters/signals"
 	"github.com/costap/vger/internal/cli/ui"
 	"github.com/costap/vger/internal/domain"
 	"github.com/spf13/cobra"
@@ -26,12 +25,11 @@ Examples:
   vger track list --status spotted
   vger track list --status evaluating --category security`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		sigDir, err := signals.DefaultDir()
+		store, err := resolveSignalStore()
 		if err != nil {
 			ui.RedAlert(err)
 			return err
 		}
-		store := signals.New(sigDir)
 
 		var sigs []*domain.Signal
 

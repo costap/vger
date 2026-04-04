@@ -8,7 +8,6 @@ import (
 
 	genkitadapter "github.com/costap/vger/internal/adapters/genkit"
 	"github.com/costap/vger/internal/adapters/gemini"
-	"github.com/costap/vger/internal/adapters/signals"
 	"github.com/costap/vger/internal/cli/ui"
 	"github.com/costap/vger/internal/domain"
 	"github.com/spf13/cobra"
@@ -46,12 +45,11 @@ Examples:
 			return err
 		}
 
-		sigDir, err := signals.DefaultDir()
+		store, err := resolveSignalStore()
 		if err != nil {
 			ui.RedAlert(err)
 			return err
 		}
-		store := signals.New(sigDir)
 
 		// Load signals (filtered if flags set).
 		var sigs []*domain.Signal
