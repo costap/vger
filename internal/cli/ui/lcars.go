@@ -103,6 +103,17 @@ func LabelStyle() lipgloss.Style { return labelStyle }
 // DimStyle returns the dim grey style for use outside this package.
 func DimStyle() lipgloss.Style { return dimStyle }
 
+// BlueStyle returns the blue style for use outside this package.
+func BlueStyle() lipgloss.Style { return blueStyle }
+
+// RedStyle returns the red style for use outside this package.
+func RedStyle() lipgloss.Style { return redStyle }
+
+// GreenStyle returns a green style for use outside this package.
+func GreenStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#44CC88"))
+}
+
 // Field prints a key/value pair in LCARS style.
 func Field(key, value string) {
 	fmt.Printf("  %s  %s\n",

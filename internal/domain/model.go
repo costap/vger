@@ -82,3 +82,56 @@ type DigestReport struct {
 	KeyInsights      string         // freeform narrative of the most important takeaways
 }
 
+// ── Track ─────────────────────────────────────────────────────────────────────
+
+// Valid signal status values.
+const (
+	SignalStatusSpotted    = "spotted"
+	SignalStatusEvaluating = "evaluating"
+	SignalStatusAdopted    = "adopted"
+	SignalStatusRejected   = "rejected"
+	SignalStatusParked     = "parked"
+)
+
+// ValidSignalStatuses is the ordered list of allowed status values.
+var ValidSignalStatuses = []string{
+	SignalStatusSpotted,
+	SignalStatusEvaluating,
+	SignalStatusAdopted,
+	SignalStatusRejected,
+	SignalStatusParked,
+}
+
+// ValidSignalCategories is the ordered list of allowed category values.
+var ValidSignalCategories = []string{
+	"networking", "security", "platform", "data", "ai",
+	"observability", "developer-experience", "process", "other",
+}
+
+// Signal is a technology or idea captured by the architect for later investigation.
+type Signal struct {
+	ID             string           `json:"id"`
+	Title          string           `json:"title"`
+	Date           string           `json:"date"`            // YYYY-MM-DD
+	Source         string           `json:"source"`          // "Blog post", "Twitter/X", "Colleague", …
+	URL            string           `json:"url"`
+	Category       string           `json:"category"`
+	Status         string           `json:"status"`
+	Note           string           `json:"note"`            // why captured
+	Tags           []string         `json:"tags,omitempty"`
+	LinkedVideoIDs []string         `json:"linked_video_ids,omitempty"`
+	Enrichment     *SignalEnrichment `json:"enrichment,omitempty"`
+	CreatedAt      time.Time        `json:"created_at"`
+	UpdatedAt      time.Time        `json:"updated_at"`
+}
+
+// SignalEnrichment is the AI-generated context added after initial capture.
+type SignalEnrichment struct {
+	EnrichedAt   time.Time `json:"enriched_at"`
+	WhatItIs     string    `json:"what_it_is"`
+	Maturity     string    `json:"maturity"`
+	Alternatives []string  `json:"alternatives"`
+	StackFit     string    `json:"stack_fit"`
+	NextSteps    []string  `json:"next_steps"`
+}
+

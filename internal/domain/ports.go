@@ -44,3 +44,27 @@ type VideoQA interface {
 	Ask(ctx context.Context, question string, cached *CachedAnalysis) (string, error)
 }
 
+// SignalStore persists and retrieves tracked tech signals.
+type SignalStore interface {
+	// Save writes a signal to the backing store. Creates or overwrites by ID.
+	Save(ctx context.Context, signal *Signal) error
+
+	// Load retrieves a signal by ID. Returns (nil, nil) if not found.
+	Load(ctx context.Context, id string) (*Signal, error)
+
+	// LoadAll returns all signals, sorted by ID ascending.
+	LoadAll(ctx context.Context) ([]*Signal, error)
+
+	// LoadByStatus returns all signals matching the given status.
+	LoadByStatus(ctx context.Context, status string) ([]*Signal, error)
+
+	// LoadByCategory returns all signals matching the given category.
+	LoadByCategory(ctx context.Context, category string) ([]*Signal, error)
+
+	// NextID returns the next available zero-padded 4-digit ID string (e.g. "0042").
+	NextID(ctx context.Context) (string, error)
+
+	// Delete removes a signal by ID. Returns (nil) if not found (idempotent).
+	Delete(ctx context.Context, id string) error
+}
+
