@@ -48,6 +48,7 @@ func init() {
 	Root.AddCommand(listCmd)
 	Root.AddCommand(askCmd)
 	Root.AddCommand(digestCmd)
+	Root.AddCommand(researchCmd)
 	Root.AddCommand(track.Cmd())
 }
 

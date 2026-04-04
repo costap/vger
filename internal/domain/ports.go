@@ -38,6 +38,20 @@ type AnalysisCache interface {
 	Load(ctx context.Context, videoID string) (*CachedAnalysis, error)
 }
 
+// CacheSearcher performs relevance-scored full-text search over cached analyses.
+type CacheSearcher interface {
+	// Search returns up to maxResults cached analyses ranked by relevance to query.
+	// Relevance is scored by matching against technology names, summary, and notes.
+	Search(ctx context.Context, query string, maxResults int) ([]*CachedAnalysis, error)
+}
+
+// SignalSearcher performs a keyword search over the signal store.
+type SignalSearcher interface {
+	// Search returns all signals whose title, note, category, or enrichment context
+	// contains the query string (case-insensitive).
+	Search(ctx context.Context, query string) ([]*Signal, error)
+}
+
 // VideoQA answers follow-up questions about a video using a previously cached analysis
 // as context. No video re-upload is performed.
 type VideoQA interface {
