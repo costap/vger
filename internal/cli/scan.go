@@ -48,8 +48,14 @@ func runSingleScan(cmd *cobra.Command, url string) error {
 	ui.Status(fmt.Sprintf("Target: %s", url))
 	ui.Status("Contacting YouTube metadata relay...")
 
+	cacheDir, err := cache.DefaultDir()
+	if err != nil {
+		ui.RedAlert(err)
+		return err
+	}
+
 	ytClient := youtube.New(youtubeAPIKey)
-	gmClient := gemini.New(geminiAPIKey, geminiModel)
+	gmClient := gemini.NewWithTools(geminiAPIKey, geminiModel, cncf.New(cacheDir))
 	a := agent.New(ytClient, gmClient)
 
 	videoID, err := ytClient.ExtractVideoID(url)
@@ -58,11 +64,6 @@ func runSingleScan(cmd *cobra.Command, url string) error {
 		return err
 	}
 
-	cacheDir, err := cache.DefaultDir()
-	if err != nil {
-		ui.RedAlert(err)
-		return err
-	}
 	c := cache.New(cacheDir)
 
 	if !scanRefresh {
@@ -81,11 +82,6 @@ func runSingleScan(cmd *cobra.Command, url string) error {
 		ui.RedAlert(err)
 		return err
 	}
-
-	// Enrich: correct CNCF stages from live landscape data, validate URLs.
-	ui.Status("Cross-referencing CNCF landscape data...")
-	enricher := cncf.New(cacheDir)
-	_ = enricher.Enrich(cmd.Context(), report)
 
 	report.Stardate = ui.Stardate()
 
@@ -112,7 +108,14 @@ func runSingleScan(cmd *cobra.Command, url string) error {
 // running up to scanConcurrency analyses in parallel.
 func runPlaylistScan(cmd *cobra.Command) error {
 	ytClient := youtube.New(youtubeAPIKey)
-	gmClient := gemini.New(geminiAPIKey, geminiModel)
+
+	cacheDir, err := cache.DefaultDir()
+	if err != nil {
+		ui.RedAlert(err)
+		return err
+	}
+
+	gmClient := gemini.NewWithTools(geminiAPIKey, geminiModel, cncf.New(cacheDir))
 	a := agent.New(ytClient, gmClient)
 
 	playlistID, err := ytClient.ExtractPlaylistID(scanPlaylist)
@@ -134,13 +137,7 @@ func runPlaylistScan(cmd *cobra.Command) error {
 		return nil
 	}
 
-	cacheDir, err := cache.DefaultDir()
-	if err != nil {
-		ui.RedAlert(err)
-		return err
-	}
 	c := cache.New(cacheDir)
-	enricher := cncf.New(cacheDir)
 
 	total := len(videos)
 	ui.Status(fmt.Sprintf("Playlist: %s  |  %d videos  |  concurrency: %d", playlistID, total, scanConcurrency))
@@ -191,7 +188,6 @@ func runPlaylistScan(cmd *cobra.Command) error {
 				return
 			}
 
-			_ = enricher.Enrich(cmd.Context(), report)
 			report.Stardate = ui.Stardate()
 			entry := &domain.CachedAnalysis{
 				VideoID:  videoID,
