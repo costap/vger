@@ -301,6 +301,68 @@ vger ask --deep https://www.youtube.com/watch?v=H06qrNmGqyE \
 
 ---
 
+### `vger research` — Topic research brief
+
+Search all available sources about a technology topic and receive a structured
+synthesis with a CNCF landscape map, evidence from cached videos, tracked signals,
+investigation paths, and a bottom-line verdict.
+
+```bash
+vger research <topic> [flags]
+```
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--discover` | `false` | Search YouTube for unscanned relevant talks |
+| `--channel` | `@cncf` | YouTube channel to search when `--discover` is used |
+| `--lens` | — | Apply analytical lens (`architect`, `engineer`, `radar`, `brief`) |
+| `--max-videos` | `10` | Max cached videos to include in context |
+| `--output` | — | Write full report to a Markdown file |
+
+**Sources searched (always):**
+- Local analysis cache — scored full-text search across summaries, notes, technology names
+- CNCF landscape — related projects by name and category
+- Track signals — matching signals from your backlog
+
+**Source searched with `--discover`:**
+- YouTube channel — unscanned talks on the topic (deduplicated against cache)
+
+**Output sections:**
+- **Brief** — 2–3 sentence what-and-why
+- **CNCF Landscape** — related projects with stage and relevance
+- **Evidence from Cache** — cached talks that mention the topic
+- **Tracked Signals** — signals from your backlog matching the topic
+- **Investigation Paths** — 2–4 distinct routes to explore further
+- **Competing Approaches** — alternative technologies
+- **Verdict** — bottom-line recommendation
+- **Undiscovered Talks** — unscanned talks found via `--discover`
+
+**Examples:**
+
+```bash
+# Basic research from local knowledge base
+vger research "eBPF"
+
+# Include YouTube discovery for unscanned talks
+vger research "multi-cluster networking" --discover
+
+# Apply an architectural lens to the synthesis
+vger research "WASM in Kubernetes" --lens architect
+
+# Save full report as Markdown
+vger research "service mesh" --output service-mesh-brief.md
+
+# Discover from a specific channel
+vger research "eBPF" --discover --channel @isovalent
+```
+
+> **Tip:** Run `vger scan --playlist <id>` first on relevant playlists to build up
+> your local knowledge base. The more you've scanned, the richer the evidence section.
+
+---
+
 ### `vger digest` — Playlist overview and learning path
 
 After scanning a playlist, produce a cross-talk overview without re-running any analysis.
@@ -496,6 +558,27 @@ vger digest --playlist PLj6h78yzYM2P... --ai --output kubecon2024.md
 # 6. Drill into a specific talk
 vger ask https://www.youtube.com/watch?v=TALK_ID \
   "What was shown in the live demo?"
+```
+
+---
+
+### Tech signal tracking + research
+
+Connect your scanned talks with your signal backlog and research topics across
+everything V'Ger knows.
+
+```bash
+# After scanning a playlist, research a specific topic
+vger research "eBPF"
+
+# Discover unscanned talks too
+vger research "eBPF" --discover
+
+# Apply a lens for a focused perspective
+vger research "service mesh" --lens architect
+
+# Save as Markdown for sharing or archiving
+vger research "WASM in Kubernetes" --output wasm-brief.md
 ```
 
 ---
