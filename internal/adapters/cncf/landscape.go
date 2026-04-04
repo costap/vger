@@ -176,6 +176,24 @@ func normalise(s string) string {
 	return s
 }
 
+// LookupProject returns the CNCF graduation stage for the given project name.
+// Returns ("", false) if the project is not found in the landscape.
+// The landscape data is loaded from the local cache or fetched from GitHub if stale.
+func (c *Client) LookupProject(ctx context.Context, name string) (stage string, found bool) {
+	projects, err := c.loadOrFetch(ctx)
+	if err != nil {
+		return "", false
+	}
+	return lookupStage(projects, name)
+}
+
+// ValidateURL returns true if the URL responds with a 2xx or 3xx status code within
+// urlCheckTimeout.
+func (c *Client) ValidateURL(ctx context.Context, url string) bool {
+	hc := &http.Client{Timeout: urlCheckTimeout}
+	return urlReachable(ctx, hc, url)
+}
+
 // urlReachable performs a HEAD request and returns true if the URL responds with
 // a 2xx or 3xx status code within urlCheckTimeout.
 func urlReachable(ctx context.Context, client *http.Client, url string) bool {

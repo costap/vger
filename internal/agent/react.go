@@ -11,9 +11,11 @@ import (
 // It wires together a MetadataFetcher and a VideoAnalyser, sequencing calls in
 // the order: fetch metadata → analyse video → return report.
 //
-// Future: replace this direct pipeline with a LangChainGo ReAct agent that
-// drives the same ports as tool functions, enabling multi-step reasoning and
-// CNCF Landscape enrichment between steps.
+// The outer pipeline is intentionally fixed in Go: both steps are always required
+// in the same order, and keeping them deterministic allows cache checks before any
+// LLM cost is incurred. The VideoAnalyser implementation (gemini.Client) runs its
+// own internal function-calling loop for non-deterministic enrichment steps such as
+// CNCF landscape lookups and URL validation.
 type ScanAgent struct {
 	fetcher  domain.MetadataFetcher
 	analyser domain.VideoAnalyser
