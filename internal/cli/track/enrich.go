@@ -21,7 +21,8 @@ Any existing enrichment is overwritten (idempotent — safe to re-run).
 
 Example:
   vger track enrich 0001`,
-	Args: cobra.ExactArgs(1),
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: signalIDCompletionFunc,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		key := geminiKey(cmd)
 		if key == "" {

@@ -54,6 +54,7 @@ Examples:
 			ui.RedAlert(err)
 			return err
 		}
+		saveChannelHistory(listChannel, channelID, channelName)
 
 		ui.Status(fmt.Sprintf("Channel: %s  [%s]", channelName, channelID))
 
@@ -182,5 +183,7 @@ func init() {
 	listCmd.Flags().StringVar(&listSearch, "search", "", "Filter by title/description keyword")
 	listCmd.Flags().Int64Var(&listMax, "max", 50, "Maximum number of results to return")
 	listCmd.Flags().BoolVar(&listPlaylists, "playlists", false, "List playlists instead of videos")
+
+	_ = listCmd.RegisterFlagCompletionFunc("channel", channelCompletionFunc)
 }
 

@@ -20,7 +20,8 @@ Valid statuses: spotted → evaluating → adopted | rejected | parked
 Examples:
   vger track status 0001 evaluating
   vger track status 0001 adopted`,
-	Args: cobra.ExactArgs(2),
+	Args:              cobra.ExactArgs(2),
+	ValidArgsFunction: trackStatusCompletionFunc,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		id := fmt.Sprintf("%04s", args[0])
 		newStatus := args[1]

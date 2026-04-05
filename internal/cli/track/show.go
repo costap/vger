@@ -9,13 +9,14 @@ import (
 )
 
 var showCmd = &cobra.Command{
-	Use:   "show <id>",
-	Short: "Display a signal in detail",
+	Use:               "show <id>",
+	Short:             "Display a signal in detail",
 	Long: `Display the full details of a tracked signal, including any AI enrichment.
 
 Example:
   vger track show 0001`,
-	Args: cobra.ExactArgs(1),
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: signalIDCompletionFunc,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		id := fmt.Sprintf("%04s", args[0])
 

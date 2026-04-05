@@ -112,11 +112,12 @@ func runResearch(cmd *cobra.Command, args []string) error {
 		ui.Status(fmt.Sprintf("Discovering unscanned talks on %q…", topic))
 		ytClient := youtube.New(youtubeAPIKey)
 		channelRef := researchChannel
-		channelID, _, err := ytClient.ResolveChannel(ctx, channelRef)
+		channelID, channelName, err := ytClient.ResolveChannel(ctx, channelRef)
 		if err != nil {
 			ui.RedAlert(fmt.Errorf("resolve channel %q: %w", channelRef, err))
 			return err
 		}
+		saveChannelHistory(channelRef, channelID, channelName)
 		all, err := ytClient.ListVideos(ctx, channelID, topic, 20)
 		if err != nil {
 			ui.RedAlert(err)
@@ -216,6 +217,7 @@ func init() {
 		}
 		return names, cobra.ShellCompDirectiveNoFileComp
 	})
+	_ = researchCmd.RegisterFlagCompletionFunc("channel", channelCompletionFunc)
 }
 
 // signalSummaries converts matched signals into compact SignalSummary values.
