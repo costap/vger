@@ -28,6 +28,7 @@ type RelatedProject struct {
 type EvidenceEntry struct {
 	VideoTitle string
 	VideoURL   string
+	Speakers   []string
 	Relevance  string // what the video said about the topic (LLM-generated)
 }
 

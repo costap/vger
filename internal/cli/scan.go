@@ -256,6 +256,9 @@ func renderReport(report *domain.Report) {
 		ui.Field("duration", formatDuration(report.VideoDurationSec))
 	}
 	ui.Field("stardate", report.Stardate)
+	if len(report.Speakers) > 0 {
+		ui.Field("speakers", strings.Join(report.Speakers, ", "))
+	}
 
 	ui.SectionHeader("Summary")
 	fmt.Printf("\n  %s\n", report.Summary)

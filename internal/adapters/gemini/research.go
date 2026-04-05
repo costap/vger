@@ -151,7 +151,7 @@ func (c *Client) ResearchSynthesize(
 		return nil, fmt.Errorf("unmarshal research response: %w (raw: %.200s)", err, raw)
 	}
 
-	return toResearchReport(topic, r, talks), nil
+	return toResearchReport(topic, r, hits, talks), nil
 }
 
 // investigationSystemPrompt instructs Gemini on how to use research tools.
@@ -325,7 +325,15 @@ func buildResearchPrompt(
 	return sb.String()
 }
 
-func toResearchReport(topic string, r researchReportJSON, talks []domain.VideoListing) *domain.ResearchReport {
+func toResearchReport(topic string, r researchReportJSON, hits []*domain.CachedAnalysis, talks []domain.VideoListing) *domain.ResearchReport {
+	// Build a URL→speakers lookup from cached hits for evidence enrichment.
+	speakersByURL := make(map[string][]string, len(hits))
+	for _, h := range hits {
+		if len(h.Report.Speakers) > 0 {
+			speakersByURL[h.Metadata.URL] = h.Report.Speakers
+		}
+	}
+
 	projects := make([]domain.RelatedProject, len(r.LandscapeMap))
 	for i, p := range r.LandscapeMap {
 		projects[i] = domain.RelatedProject{
@@ -342,6 +350,7 @@ func toResearchReport(topic string, r researchReportJSON, talks []domain.VideoLi
 		evidence[i] = domain.EvidenceEntry{
 			VideoTitle: e.VideoTitle,
 			VideoURL:   e.VideoURL,
+			Speakers:   speakersByURL[e.VideoURL],
 			Relevance:  e.Relevance,
 		}
 	}

@@ -163,13 +163,17 @@ func ListingRow(index int, v domain.VideoListing, entry *domain.CachedAnalysis) 
 		blueStyle.Render(v.URL),
 	)
 
-	// For cached videos render a compact tag line with Gemini-extracted tech names.
+	// For cached videos render a compact tag line with Gemini-extracted tech names
+	// and speaker names.
 	if entry != nil {
-		if tags := entry.Tags(); len(tags) > 0 {
-			chips := make([]string, 0, len(tags))
-			for _, t := range tags {
-				chips = append(chips, blueStyle.Render("["+t+"]"))
-			}
+		var chips []string
+		for _, s := range entry.Speakers() {
+			chips = append(chips, dimStyle.Render("("+s+")"))
+		}
+		for _, t := range entry.Tags() {
+			chips = append(chips, blueStyle.Render("["+t+"]"))
+		}
+		if len(chips) > 0 {
 			fmt.Printf("    %s\n", strings.Join(chips, " "))
 		}
 	}

@@ -55,6 +55,9 @@ func RenderResearchReport(r *domain.ResearchReport) {
 				labelStyle.Render(fmt.Sprintf("[%d]", i+1)),
 				bodyStyle.Render(e.VideoTitle),
 			)
+			if len(e.Speakers) > 0 {
+				fmt.Printf("    %s\n", dimStyle.Render("Speakers: "+strings.Join(e.Speakers, ", ")))
+			}
 			if e.Relevance != "" {
 				fmt.Printf("    %s\n", dimStyle.Render(e.Relevance))
 			}
