@@ -59,10 +59,19 @@ type Report struct {
 // It stores both the raw metadata and the final report so that follow-up
 // questions can be answered without re-uploading the video.
 type CachedAnalysis struct {
-	VideoID  string        `json:"video_id"`
-	CachedAt time.Time     `json:"cached_at"`
-	Metadata VideoMetadata `json:"metadata"`
-	Report   Report        `json:"report"`
+	VideoID  string               `json:"video_id"`
+	CachedAt time.Time            `json:"cached_at"`
+	Metadata VideoMetadata        `json:"metadata"`
+	Report   Report               `json:"report"`
+	Playlists []PlaylistMembership `json:"playlists,omitempty"`
+}
+
+// PlaylistMembership records a playlist that this video was scanned from.
+// A video can belong to multiple playlists.
+type PlaylistMembership struct {
+	PlaylistID    string    `json:"playlist_id"`
+	PlaylistTitle string    `json:"playlist_title"`
+	AddedAt       time.Time `json:"added_at"`
 }
 
 // Tags returns the technology names extracted from the analysis report.
@@ -74,6 +83,27 @@ func (c *CachedAnalysis) Tags() []string {
 		names = append(names, t.Name)
 	}
 	return names
+}
+
+// Events returns the playlist titles this video was scanned from.
+// Playlist titles (e.g. "KubeCon EU 2025") serve as event tags for filtering.
+func (c *CachedAnalysis) Events() []string {
+	titles := make([]string, 0, len(c.Playlists))
+	for _, p := range c.Playlists {
+		titles = append(titles, p.PlaylistTitle)
+	}
+	return titles
+}
+
+// HasPlaylist reports whether the given playlist ID is already recorded in the
+// membership list. Used to avoid duplicate entries when re-scanning a playlist.
+func (c *CachedAnalysis) HasPlaylist(playlistID string) bool {
+	for _, p := range c.Playlists {
+		if p.PlaylistID == playlistID {
+			return true
+		}
+	}
+	return false
 }
 
 // TechCount records how many talks in a playlist mentioned a given technology.
