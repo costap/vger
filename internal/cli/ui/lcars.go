@@ -125,16 +125,17 @@ func Field(key, value string) {
 	)
 }
 
-// ListingRow prints a numbered video listing row with optional cache indicator,
-// duration, and view count. Fields are omitted gracefully when zero/empty.
-func ListingRow(index int, v domain.VideoListing, cached bool) {
+// ListingRow prints a numbered video listing row with cache indicator, duration,
+// view count, and (for cached videos) a line of Gemini-derived technology tags.
+// Pass a non-nil entry to show the ★ indicator and tech tags; nil renders a dim dot.
+func ListingRow(index int, v domain.VideoListing, entry *domain.CachedAnalysis) {
 	date := v.PublishedAt
 	if len(date) >= 10 {
 		date = date[:10]
 	}
 
 	var indicator string
-	if cached {
+	if entry != nil {
 		indicator = labelStyle.Render("★")
 	} else {
 		indicator = dimStyle.Render("·")
@@ -161,6 +162,17 @@ func ListingRow(index int, v domain.VideoListing, cached bool) {
 		bodyStyle.Render(v.Title),
 		blueStyle.Render(v.URL),
 	)
+
+	// For cached videos render a compact tag line with Gemini-extracted tech names.
+	if entry != nil {
+		if tags := entry.Tags(); len(tags) > 0 {
+			chips := make([]string, 0, len(tags))
+			for _, t := range tags {
+				chips = append(chips, blueStyle.Render("["+t+"]"))
+			}
+			fmt.Printf("    %s\n", strings.Join(chips, " "))
+		}
+	}
 }
 
 // formatISO8601Duration converts an ISO 8601 duration string (e.g. "PT1H15M32S")

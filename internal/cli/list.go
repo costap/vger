@@ -1,30 +1,39 @@
 package cli
 
 import (
+	"context"
 	"fmt"
+	"strings"
 
 	"github.com/costap/vger/internal/adapters/cache"
 	"github.com/costap/vger/internal/adapters/youtube"
 	"github.com/costap/vger/internal/cli/ui"
+	"github.com/costap/vger/internal/domain"
 	"github.com/spf13/cobra"
 )
 
-// loadCacheIndex returns the set of cached video IDs from the local cache.
+// loadCacheEntries loads full CachedAnalysis entries for the given video IDs.
 // Best-effort: returns an empty map on any error so listings still render.
-func loadCacheIndex() map[string]bool {
+func loadCacheEntries(videoIDs []string) map[string]*domain.CachedAnalysis {
 	dir, err := cache.DefaultDir()
 	if err != nil {
-		return map[string]bool{}
+		return map[string]*domain.CachedAnalysis{}
 	}
-	index, err := cache.New(dir).LoadIndex()
+	c := cache.New(dir)
+	entries, err := c.LoadByVideoIDs(context.Background(), videoIDs)
 	if err != nil {
-		return map[string]bool{}
+		return map[string]*domain.CachedAnalysis{}
 	}
-	return index
+	m := make(map[string]*domain.CachedAnalysis, len(entries))
+	for _, e := range entries {
+		m[e.VideoID] = e
+	}
+	return m
 }
 
 var listChannel string
 var listSearch string
+var listTags string
 var listMax int64
 var listPlaylists bool
 var listPlaylist string
@@ -42,11 +51,17 @@ Video results are retrieved by walking the channel's complete uploads history an
 filtering client-side — so results are comprehensive, not limited by YouTube's
 search index. All matching videos will be found regardless of age or popularity.
 
+Cached videos (★) show technology tags extracted by Gemini from prior scans.
+Use --tags to filter the listing to only videos whose cached analysis contains
+a matching technology (case-insensitive substring). Composable with --search.
+
 Examples:
   vger list --channel @cncf
   vger list --channel @cncf --playlists
   vger list --channel @cncf --playlists --search kubecon
   vger list --channel @cncf --search argocon
+  vger list --channel @cncf --tags ebpf
+  vger list --channel @cncf --tags kubernetes --search 2024
   vger list --playlist "https://www.youtube.com/playlist?list=PLj6h78yzYM2P-3T82bF...a"
   vger list --playlist PLj6h78yzYM2P...a --search "service mesh"
   vger list --channel UCvqbFHwN-nwalWPjPUKpvTA --search "kubecon 2024" --max 100`,
@@ -112,11 +127,27 @@ func runListVideos(cmd *cobra.Command, ytClient *youtube.Client, channelID, chan
 		ui.Status(fmt.Sprintf("(metadata enrichment unavailable: %v)", err))
 	}
 
+	// Load cache entries for all retrieved videos (best-effort).
+	ids := make([]string, len(listings))
+	for i, v := range listings {
+		ids[i] = v.VideoID
+	}
+	cacheEntries := loadCacheEntries(ids)
+
+	// Apply --tags filter if set: keep only cached videos whose technology tags match.
+	if listTags != "" {
+		listings = filterByTag(listings, cacheEntries, listTags)
+		if len(listings) == 0 {
+			ui.Complete(fmt.Sprintf("No cached videos found matching tag %q.", listTags))
+			return nil
+		}
+		ui.Status(fmt.Sprintf("Tag filter %q matched %d cached video(s).", listTags, len(listings)))
+	}
+
 	ui.SectionHeader(fmt.Sprintf("Videos — %s", channelName))
 	fmt.Println()
-	cacheIndex := loadCacheIndex()
 	for i, v := range listings {
-		ui.ListingRow(i+1, v, cacheIndex[v.VideoID])
+		ui.ListingRow(i+1, v, cacheEntries[v.VideoID])
 	}
 	fmt.Println()
 	return nil
@@ -192,11 +223,27 @@ func runListPlaylistVideos(cmd *cobra.Command, ytClient *youtube.Client) error {
 		ui.Status(fmt.Sprintf("(metadata enrichment unavailable: %v)", err))
 	}
 
+	// Load cache entries for all retrieved videos (best-effort).
+	ids := make([]string, len(listings))
+	for i, v := range listings {
+		ids[i] = v.VideoID
+	}
+	cacheEntries := loadCacheEntries(ids)
+
+	// Apply --tags filter if set: keep only cached videos whose technology tags match.
+	if listTags != "" {
+		listings = filterByTag(listings, cacheEntries, listTags)
+		if len(listings) == 0 {
+			ui.Complete(fmt.Sprintf("No cached videos found matching tag %q.", listTags))
+			return nil
+		}
+		ui.Status(fmt.Sprintf("Tag filter %q matched %d cached video(s).", listTags, len(listings)))
+	}
+
 	ui.SectionHeader(fmt.Sprintf("Playlist — %s", playlistID))
 	fmt.Println()
-	cacheIndex := loadCacheIndex()
 	for i, v := range listings {
-		ui.ListingRow(i+1, v, cacheIndex[v.VideoID])
+		ui.ListingRow(i+1, v, cacheEntries[v.VideoID])
 	}
 	fmt.Println()
 	return nil
@@ -206,9 +253,30 @@ func init() {
 	listCmd.Flags().StringVar(&listChannel, "channel", "", "Channel ID (UCxx...) or handle (@name)")
 	listCmd.Flags().StringVar(&listPlaylist, "playlist", "", "Playlist ID or URL to list videos from")
 	listCmd.Flags().StringVar(&listSearch, "search", "", "Filter by title/description keyword")
+	listCmd.Flags().StringVar(&listTags, "tags", "", "Filter by technology tag from cached analyses (e.g. --tags ebpf)")
 	listCmd.Flags().Int64Var(&listMax, "max", 50, "Maximum number of results to return")
 	listCmd.Flags().BoolVar(&listPlaylists, "playlists", false, "List playlists instead of videos")
 
 	_ = listCmd.RegisterFlagCompletionFunc("channel", channelCompletionFunc)
+}
+
+// filterByTag returns the subset of listings that are cached and have at least one
+// technology tag containing tagQuery (case-insensitive substring match).
+func filterByTag(listings []domain.VideoListing, entries map[string]*domain.CachedAnalysis, tagQuery string) []domain.VideoListing {
+	q := strings.ToLower(tagQuery)
+	var out []domain.VideoListing
+	for _, v := range listings {
+		entry, ok := entries[v.VideoID]
+		if !ok || entry == nil {
+			continue
+		}
+		for _, t := range entry.Tags() {
+			if strings.Contains(strings.ToLower(t), q) {
+				out = append(out, v)
+				break
+			}
+		}
+	}
+	return out
 }
 

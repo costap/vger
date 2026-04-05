@@ -85,6 +85,9 @@ func scoreEntry(entry *domain.CachedAnalysis, q string) int {
 			score += 2
 		}
 	}
+	if strings.Contains(strings.ToLower(entry.Metadata.Title), q) {
+		score += 2
+	}
 	if strings.Contains(strings.ToLower(entry.Report.Summary), q) {
 		score += 2
 	}

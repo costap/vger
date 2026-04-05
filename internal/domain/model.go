@@ -10,8 +10,7 @@ type VideoMetadata struct {
 	ChannelName string
 	PublishedAt string
 	DurationSec int
-	ViewCount   int64
-	Tags        []string
+	ViewCount int64
 }
 
 // VideoListing is a lightweight entry returned when browsing a channel's video catalogue.
@@ -64,6 +63,17 @@ type CachedAnalysis struct {
 	CachedAt time.Time     `json:"cached_at"`
 	Metadata VideoMetadata `json:"metadata"`
 	Report   Report        `json:"report"`
+}
+
+// Tags returns the technology names extracted from the analysis report.
+// These are derived from Gemini's analysis and serve as content-aware tags,
+// since YouTube's API does not expose video tags for videos the caller doesn't own.
+func (c *CachedAnalysis) Tags() []string {
+	names := make([]string, 0, len(c.Report.Technologies))
+	for _, t := range c.Report.Technologies {
+		names = append(names, t.Name)
+	}
+	return names
 }
 
 // TechCount records how many talks in a playlist mentioned a given technology.
