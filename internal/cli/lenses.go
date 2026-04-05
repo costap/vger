@@ -36,8 +36,8 @@ var builtinLenses = []Lens{
 			"What specific versions, APIs, or tools were called out?",
 	},
 	{
-		Name:      "radar",
-		ShortDesc: "Tech radar: Adopt / Trial / Assess / Hold recommendation per technology",
+		Name:        "radar",
+		ShortDesc:   "Tech radar: Adopt / Trial / Assess / Hold recommendation per technology",
 		RoleContext: "Act as a technology radar analyst assessing technologies for enterprise adoption.",
 		DefaultQuestion: "For each significant technology mentioned in this talk, provide a technology radar " +
 			"recommendation: Adopt, Trial, Assess, or Hold. " +
@@ -45,8 +45,8 @@ var builtinLenses = []Lens{
 			"maturity, production usage, community, operational complexity, and vendor risk.",
 	},
 	{
-		Name:      "brief",
-		ShortDesc: "Team briefing: 3–5 bullet summary of problem, approach, takeaways, action",
+		Name:        "brief",
+		ShortDesc:   "Team briefing: 3–5 bullet summary of problem, approach, takeaways, action",
 		RoleContext: "Act as a technical lead writing a concise briefing for your engineering team.",
 		DefaultQuestion: "Summarise this talk in 3–5 bullet points covering: " +
 			"what problem it addresses, the approach taken, the key technical takeaways, " +

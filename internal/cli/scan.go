@@ -156,12 +156,12 @@ func runPlaylistScan(cmd *cobra.Command) error {
 	}
 
 	var (
-		scanned  atomic.Int64
-		skipped  atomic.Int64
-		failed   atomic.Int64
-		mu       sync.Mutex
-		wg       sync.WaitGroup
-		sem      = make(chan struct{}, scanConcurrency)
+		scanned atomic.Int64
+		skipped atomic.Int64
+		failed  atomic.Int64
+		mu      sync.Mutex
+		wg      sync.WaitGroup
+		sem     = make(chan struct{}, scanConcurrency)
 	)
 
 	for i, v := range videos {

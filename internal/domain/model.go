@@ -10,7 +10,7 @@ type VideoMetadata struct {
 	ChannelName string
 	PublishedAt string
 	DurationSec int
-	ViewCount int64
+	ViewCount   int64
 }
 
 // VideoListing is a lightweight entry returned when browsing a channel's video catalogue.
@@ -51,7 +51,7 @@ type Report struct {
 	VideoDurationSec int
 	Stardate         string
 	Summary          string
-	Notes            string       // detailed freeform narrative from Gemini covering everything mentioned
+	Notes            string // detailed freeform narrative from Gemini covering everything mentioned
 	Technologies     []Technology
 }
 
@@ -59,10 +59,10 @@ type Report struct {
 // It stores both the raw metadata and the final report so that follow-up
 // questions can be answered without re-uploading the video.
 type CachedAnalysis struct {
-	VideoID  string               `json:"video_id"`
-	CachedAt time.Time            `json:"cached_at"`
-	Metadata VideoMetadata        `json:"metadata"`
-	Report   Report               `json:"report"`
+	VideoID   string               `json:"video_id"`
+	CachedAt  time.Time            `json:"cached_at"`
+	Metadata  VideoMetadata        `json:"metadata"`
+	Report    Report               `json:"report"`
 	Playlists []PlaylistMembership `json:"playlists,omitempty"`
 }
 
@@ -155,19 +155,19 @@ var ValidSignalCategories = []string{
 
 // Signal is a technology or idea captured by the architect for later investigation.
 type Signal struct {
-	ID             string           `json:"id"`
-	Title          string           `json:"title"`
-	Date           string           `json:"date"`            // YYYY-MM-DD
-	Source         string           `json:"source"`          // "Blog post", "Twitter/X", "Colleague", …
-	URL            string           `json:"url"`
-	Category       string           `json:"category"`
-	Status         string           `json:"status"`
-	Note           string           `json:"note"`            // why captured
-	Tags           []string         `json:"tags,omitempty"`
-	LinkedVideoIDs []string         `json:"linked_video_ids,omitempty"`
+	ID             string            `json:"id"`
+	Title          string            `json:"title"`
+	Date           string            `json:"date"`   // YYYY-MM-DD
+	Source         string            `json:"source"` // "Blog post", "Twitter/X", "Colleague", …
+	URL            string            `json:"url"`
+	Category       string            `json:"category"`
+	Status         string            `json:"status"`
+	Note           string            `json:"note"` // why captured
+	Tags           []string          `json:"tags,omitempty"`
+	LinkedVideoIDs []string          `json:"linked_video_ids,omitempty"`
 	Enrichment     *SignalEnrichment `json:"enrichment,omitempty"`
-	CreatedAt      time.Time        `json:"created_at"`
-	UpdatedAt      time.Time        `json:"updated_at"`
+	CreatedAt      time.Time         `json:"created_at"`
+	UpdatedAt      time.Time         `json:"updated_at"`
 }
 
 // SignalEnrichment is the AI-generated context added after initial capture.

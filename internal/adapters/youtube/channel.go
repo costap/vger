@@ -285,20 +285,20 @@ func (c *Client) ListPlaylistVideos(ctx context.Context, playlistID, query strin
 // Returns the playlist ID itself if the title cannot be resolved.
 // Quota cost: 1 unit.
 func (c *Client) GetPlaylistTitle(ctx context.Context, playlistID string) (string, error) {
-svc, err := c.newService(ctx)
-if err != nil {
-return playlistID, err
-}
+	svc, err := c.newService(ctx)
+	if err != nil {
+		return playlistID, err
+	}
 
-resp, err := svc.Playlists.List([]string{"snippet"}).
-Id(playlistID).
-MaxResults(1).
-Do()
-if err != nil {
-return playlistID, fmt.Errorf("youtube playlists.list: %w", err)
-}
-if len(resp.Items) == 0 {
-return playlistID, nil
-}
-return resp.Items[0].Snippet.Title, nil
+	resp, err := svc.Playlists.List([]string{"snippet"}).
+		Id(playlistID).
+		MaxResults(1).
+		Do()
+	if err != nil {
+		return playlistID, fmt.Errorf("youtube playlists.list: %w", err)
+	}
+	if len(resp.Items) == 0 {
+		return playlistID, nil
+	}
+	return resp.Items[0].Snippet.Title, nil
 }

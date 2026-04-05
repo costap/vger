@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	genkitadapter "github.com/costap/vger/internal/adapters/genkit"
 	"github.com/costap/vger/internal/adapters/gemini"
+	genkitadapter "github.com/costap/vger/internal/adapters/genkit"
 	"github.com/costap/vger/internal/cli/ui"
 	"github.com/costap/vger/internal/domain"
 	"github.com/spf13/cobra"

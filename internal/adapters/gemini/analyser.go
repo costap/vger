@@ -286,4 +286,3 @@ func stripCodeFences(s string) string {
 	}
 	return s
 }
-

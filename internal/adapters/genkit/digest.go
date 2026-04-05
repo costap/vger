@@ -49,7 +49,7 @@ Rules:
 
 // DigestInput is the input to the digest flow.
 type DigestInput struct {
-	Signals []domain.Signal   `json:"signals"`
+	Signals []domain.Signal    `json:"signals"`
 	Pulse   domain.SignalPulse `json:"pulse"`
 }
 

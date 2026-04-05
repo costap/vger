@@ -51,4 +51,3 @@ func init() {
 	Root.AddCommand(researchCmd)
 	Root.AddCommand(track.Cmd())
 }
-

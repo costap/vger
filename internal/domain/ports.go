@@ -91,4 +91,3 @@ type SignalStore interface {
 	// Delete removes a signal by ID. Returns (nil) if not found (idempotent).
 	Delete(ctx context.Context, id string) error
 }
-

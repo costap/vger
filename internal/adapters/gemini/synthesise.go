@@ -35,10 +35,10 @@ Rules:
 - Return only the JSON object. Do not wrap it in markdown code fences.`
 
 type synthesiseResponse struct {
-	OverarchingTheme string              `json:"overarching_theme"`
-	LearningPath     []string            `json:"learning_path"`
-	PriorityTalks    []priorityTalkResp  `json:"priority_talks"`
-	KeyInsights      string              `json:"key_insights"`
+	OverarchingTheme string             `json:"overarching_theme"`
+	LearningPath     []string           `json:"learning_path"`
+	PriorityTalks    []priorityTalkResp `json:"priority_talks"`
+	KeyInsights      string             `json:"key_insights"`
 }
 
 type priorityTalkResp struct {

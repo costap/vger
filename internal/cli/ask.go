@@ -153,5 +153,3 @@ func init() {
 	// Complete the first positional arg (YouTube URL) with cached video URLs.
 	askCmd.ValidArgsFunction = cachedVideoCompletionFunc
 }
-
-
