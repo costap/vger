@@ -12,7 +12,6 @@ var wellKnownChannels = []string{
 	"@BackstageCommunity\tBackstage Community",
 	// Service mesh & networking
 	"@Istio\tIstio",
-	"@istio\tIstio",
 	"@isovalent\tIsovalent (Cilium)",
 	"@ciliumproject\tCilium Project",
 	"@eBPFCilium\teBPF & Cilium",
@@ -33,7 +32,6 @@ var wellKnownChannels = []string{
 	"@googlecloud\tGoogle Cloud",
 	"@Google\tGoogle",
 	"@GoogleCloudTech\tGoogle Cloud Tech",
-	"@googlecloudtech\tGoogle Cloud Tech",
 	"@GoogleDevelopers\tGoogle Developers",
 	"@GoogleOpenSource\tGoogle Open Source",
 	"@GoogleTechTalks\tGoogle Tech Talks",

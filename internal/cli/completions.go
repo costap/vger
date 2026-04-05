@@ -14,25 +14,6 @@ import (
 	"github.com/costap/vger/internal/domain"
 )
 
-// wellKnownChannels is a curated list of cloud-native and DevOps conference channels.
-// Each entry is "handle\tdisplay name" for shell tab-completion hints.
-var wellKnownChannels = []string{
-	"@cncf\tCloud Native Computing Foundation",
-	"@KubernetesKubernetes\tKubernetes",
-	"@linuxfoundation\tLinux Foundation",
-	"@hashicorp\tHashiCorp",
-	"@grafana\tGrafana Labs",
-	"@argoproject\tArgo Project",
-	"@istio\tIstio",
-	"@opentelemetry\tOpenTelemetry",
-	"@fluxcd\tFlux CD",
-	"@ciliumproject\tCilium Project",
-	"@envoyproxy\tEnvoy Proxy",
-	"@GoogleCloudTech\tGoogle Cloud Tech",
-	"@awsdevelopers\tAWS Developers",
-	"@MicrosoftAzure\tMicrosoft Azure",
-}
-
 // channelEntry is persisted in ~/.vger/channels.json.
 type channelEntry struct {
 	Handle string `json:"handle"`
@@ -269,4 +250,3 @@ func loadSignalStoreForCompletion() (domain.SignalStore, error) {
 	}
 	return signals.New(jsonDir), nil
 }
-
