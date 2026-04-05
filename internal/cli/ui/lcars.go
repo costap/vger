@@ -3,10 +3,13 @@ package ui
 import (
 	"fmt"
 	"math"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/costap/vger/internal/domain"
 )
 
 // LCARS colour palette
@@ -122,18 +125,84 @@ func Field(key, value string) {
 	)
 }
 
-// ListingRow prints a numbered video listing row: index, date, title, url.
-func ListingRow(index int, publishedAt, title, url string) {
-	date := publishedAt
+// ListingRow prints a numbered video listing row with optional cache indicator,
+// duration, and view count. Fields are omitted gracefully when zero/empty.
+func ListingRow(index int, v domain.VideoListing, cached bool) {
+	date := v.PublishedAt
 	if len(date) >= 10 {
 		date = date[:10]
 	}
-	fmt.Printf("  %s  %s  %s\n    %s\n",
+
+	var indicator string
+	if cached {
+		indicator = labelStyle.Render("★")
+	} else {
+		indicator = dimStyle.Render("·")
+	}
+
+	// Build optional metadata tokens (duration, views).
+	var meta []string
+	if dur := formatISO8601Duration(v.Duration); dur != "" {
+		meta = append(meta, dimStyle.Render(dur))
+	}
+	if v.ViewCount > 0 {
+		meta = append(meta, dimStyle.Render(formatViewCount(v.ViewCount)+" views"))
+	}
+	metaStr := ""
+	if len(meta) > 0 {
+		metaStr = "  " + strings.Join(meta, "  ")
+	}
+
+	fmt.Printf("  %s %s  %s%s  %s\n    %s\n",
 		labelStyle.Render(fmt.Sprintf("%3d", index)),
+		indicator,
 		dimStyle.Render(date),
-		bodyStyle.Render(title),
-		blueStyle.Render(url),
+		metaStr,
+		bodyStyle.Render(v.Title),
+		blueStyle.Render(v.URL),
 	)
+}
+
+// formatISO8601Duration converts an ISO 8601 duration string (e.g. "PT1H15M32S")
+// into a compact human-readable form ("1h15m", "45m", "8m30s").
+// Returns "" for empty or unrecognisable input.
+func formatISO8601Duration(iso string) string {
+	if iso == "" {
+		return ""
+	}
+	re := regexp.MustCompile(`PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?`)
+	m := re.FindStringSubmatch(iso)
+	if m == nil {
+		return ""
+	}
+	hours, _ := strconv.Atoi(m[1])
+	mins, _ := strconv.Atoi(m[2])
+	secs, _ := strconv.Atoi(m[3])
+
+	switch {
+	case hours > 0 && secs == 0:
+		return fmt.Sprintf("%dh%dm", hours, mins)
+	case hours > 0:
+		return fmt.Sprintf("%dh%dm%ds", hours, mins, secs)
+	case mins > 0 && secs == 0:
+		return fmt.Sprintf("%dm", mins)
+	case mins > 0:
+		return fmt.Sprintf("%dm%ds", mins, secs)
+	default:
+		return fmt.Sprintf("%ds", secs)
+	}
+}
+
+// formatViewCount formats a view count as a compact string: "1.2M", "42K", "999".
+func formatViewCount(n int64) string {
+	switch {
+	case n >= 1_000_000:
+		return fmt.Sprintf("%.1fM", float64(n)/1_000_000)
+	case n >= 1_000:
+		return fmt.Sprintf("%.0fK", float64(n)/1_000)
+	default:
+		return strconv.FormatInt(n, 10)
+	}
 }
 
 // PlaylistRow prints a numbered playlist row: index, date, video count, title, url.

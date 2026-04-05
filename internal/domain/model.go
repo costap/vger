@@ -10,15 +10,19 @@ type VideoMetadata struct {
 	ChannelName string
 	PublishedAt string
 	DurationSec int
+	ViewCount   int64
 }
 
 // VideoListing is a lightweight entry returned when browsing a channel's video catalogue.
 type VideoListing struct {
-	VideoID     string
-	Title       string
-	PublishedAt string
-	URL         string
-	Description string
+	VideoID      string
+	Title        string
+	PublishedAt  string
+	URL          string
+	Description  string
+	ChannelTitle string // uploader channel display name
+	Duration     string // ISO 8601 e.g. "PT45M12S" — empty if not enriched
+	ViewCount    int64  // 0 if not enriched
 }
 
 // PlaylistListing is a lightweight entry returned when browsing a channel's playlists.

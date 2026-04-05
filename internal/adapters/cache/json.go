@@ -86,3 +86,31 @@ func (c *JSONCache) LoadByVideoIDs(ctx context.Context, videoIDs []string) ([]*d
 func (c *JSONCache) path(videoID string) string {
 	return filepath.Join(c.dir, videoID+".json")
 }
+
+// LoadIndex returns a set of all video IDs that have a cached analysis.
+// It reads only the filenames in the cache directory — no JSON parsing — so it
+// is fast enough to call on every `vger list` invocation.
+// The returned map is safe to query even when the cache directory does not exist.
+func (c *JSONCache) LoadIndex() (map[string]bool, error) {
+	entries, err := os.ReadDir(c.dir)
+	if os.IsNotExist(err) {
+		return map[string]bool{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read cache dir: %w", err)
+	}
+
+	index := make(map[string]bool, len(entries))
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || filepath.Ext(name) != ".json" {
+			continue
+		}
+		videoID := name[:len(name)-len(".json")]
+		if videoID == "cncf_landscape" {
+			continue
+		}
+		index[videoID] = true
+	}
+	return index, nil
+}

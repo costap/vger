@@ -30,7 +30,7 @@ func (c *Client) FetchMetadata(ctx context.Context, rawURL string) (*domain.Vide
 	}
 
 	resp, err := svc.Videos.
-		List([]string{"snippet", "contentDetails"}).
+		List([]string{"snippet", "contentDetails", "statistics"}).
 		Id(videoID).
 		Do()
 	if err != nil {
@@ -48,5 +48,6 @@ func (c *Client) FetchMetadata(ctx context.Context, rawURL string) (*domain.Vide
 		ChannelName: item.Snippet.ChannelTitle,
 		PublishedAt: item.Snippet.PublishedAt,
 		DurationSec: parseISO8601Duration(item.ContentDetails.Duration),
+		ViewCount:   int64(item.Statistics.ViewCount),
 	}, nil
 }

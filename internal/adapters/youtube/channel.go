@@ -131,11 +131,12 @@ func (c *Client) listVideosWithScanCount(ctx context.Context, channelID, query s
 
 			id := sn.ResourceId.VideoId
 			listings = append(listings, domain.VideoListing{
-				VideoID:     id,
-				Title:       sn.Title,
-				PublishedAt: sn.PublishedAt,
-				URL:         "https://www.youtube.com/watch?v=" + id,
-				Description: sn.Description,
+				VideoID:      id,
+				Title:        sn.Title,
+				PublishedAt:  sn.PublishedAt,
+				URL:          "https://www.youtube.com/watch?v=" + id,
+				Description:  sn.Description,
+				ChannelTitle: sn.VideoOwnerChannelTitle,
 			})
 
 			if int64(len(listings)) >= maxResults {
@@ -258,11 +259,12 @@ func (c *Client) ListPlaylistVideos(ctx context.Context, playlistID, query strin
 
 			id := sn.ResourceId.VideoId
 			listings = append(listings, domain.VideoListing{
-				VideoID:     id,
-				Title:       sn.Title,
-				PublishedAt: sn.PublishedAt,
-				URL:         "https://www.youtube.com/watch?v=" + id,
-				Description: sn.Description,
+				VideoID:      id,
+				Title:        sn.Title,
+				PublishedAt:  sn.PublishedAt,
+				URL:          "https://www.youtube.com/watch?v=" + id,
+				Description:  sn.Description,
+				ChannelTitle: sn.VideoOwnerChannelTitle,
 			})
 
 			if int64(len(listings)) >= maxResults {

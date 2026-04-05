@@ -3,10 +3,25 @@ package cli
 import (
 	"fmt"
 
+	"github.com/costap/vger/internal/adapters/cache"
 	"github.com/costap/vger/internal/adapters/youtube"
 	"github.com/costap/vger/internal/cli/ui"
 	"github.com/spf13/cobra"
 )
+
+// loadCacheIndex returns the set of cached video IDs from the local cache.
+// Best-effort: returns an empty map on any error so listings still render.
+func loadCacheIndex() map[string]bool {
+	dir, err := cache.DefaultDir()
+	if err != nil {
+		return map[string]bool{}
+	}
+	index, err := cache.New(dir).LoadIndex()
+	if err != nil {
+		return map[string]bool{}
+	}
+	return index
+}
 
 var listChannel string
 var listSearch string
@@ -93,10 +108,15 @@ func runListVideos(cmd *cobra.Command, ytClient *youtube.Client, channelID, chan
 		ui.Complete(fmt.Sprintf("%d videos retrieved.", len(listings)))
 	}
 
+	if err := ytClient.EnrichWithDetails(cmd.Context(), listings); err != nil {
+		ui.Status(fmt.Sprintf("(metadata enrichment unavailable: %v)", err))
+	}
+
 	ui.SectionHeader(fmt.Sprintf("Videos — %s", channelName))
 	fmt.Println()
+	cacheIndex := loadCacheIndex()
 	for i, v := range listings {
-		ui.ListingRow(i+1, v.PublishedAt, v.Title, v.URL)
+		ui.ListingRow(i+1, v, cacheIndex[v.VideoID])
 	}
 	fmt.Println()
 	return nil
@@ -168,10 +188,15 @@ func runListPlaylistVideos(cmd *cobra.Command, ytClient *youtube.Client) error {
 		ui.Complete(fmt.Sprintf("%d videos retrieved.", len(listings)))
 	}
 
+	if err := ytClient.EnrichWithDetails(cmd.Context(), listings); err != nil {
+		ui.Status(fmt.Sprintf("(metadata enrichment unavailable: %v)", err))
+	}
+
 	ui.SectionHeader(fmt.Sprintf("Playlist — %s", playlistID))
 	fmt.Println()
+	cacheIndex := loadCacheIndex()
 	for i, v := range listings {
-		ui.ListingRow(i+1, v.PublishedAt, v.Title, v.URL)
+		ui.ListingRow(i+1, v, cacheIndex[v.VideoID])
 	}
 	fmt.Println()
 	return nil
