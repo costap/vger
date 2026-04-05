@@ -176,6 +176,9 @@ Lists videos or playlists from a YouTube channel ordered by publish date, newest
 Results are retrieved by walking the channel's **complete upload history** — not limited
 by YouTube's search index, so all videos are found regardless of age.
 
+Cached videos are marked with ★ and show the technology tags extracted by Gemini.
+Use `--cached` to search everything you have ever scanned without any YouTube API call.
+
 ```bash
 # List videos from a channel
 vger list --channel <channel-id-or-handle>
@@ -185,6 +188,9 @@ vger list --channel <channel-id-or-handle> --playlists
 
 # List videos inside a specific playlist
 vger list --playlist <playlist-id-or-url>
+
+# Browse all locally cached videos (no API call)
+vger list --cached
 ```
 
 **Examples:**
@@ -207,6 +213,21 @@ vger list --playlist "https://www.youtube.com/playlist?list=PLj6h78yzYM2P..."
 
 # Filter playlist videos by keyword
 vger list --playlist PLj6h78yzYM2P... --search "service mesh"
+
+# Filter by Gemini-extracted technology tag (only cached videos match)
+vger list --channel @cncf --tags ebpf
+
+# Combine tag and keyword filters
+vger list --channel @cncf --tags kubernetes --search 2024
+
+# Search all cached videos for a technology — no channel needed
+vger list --cached --tags ebpf
+
+# Search all cached KubeCon talks (matches playlist title)
+vger list --cached --tags kubecon
+
+# eBPF talks from KubeCon specifically
+vger list --cached --tags kubecon --search ebpf
 ```
 
 **Flags:**
@@ -217,7 +238,13 @@ vger list --playlist PLj6h78yzYM2P... --search "service mesh"
 | `--playlist` | — | Playlist ID or URL — list videos from a specific playlist |
 | `--playlists` | `false` | List playlists instead of videos |
 | `--search` | — | Filter by title/description keyword |
+| `--tags` | — | Filter by Gemini technology tag or playlist name (substring match) |
+| `--cached` | `false` | Browse all locally cached videos without any YouTube API call |
 | `--max` | `50` | Maximum number of results |
+
+> **Tag filtering** matches against both technology names extracted by Gemini (e.g. `--tags cilium`)
+> and playlist titles set when scanning (e.g. `--tags kubecon`, `--tags "eu 2025"`).
+> Only cached videos can match tag filters — uncached videos show a dim `·` indicator.
 
 ---
 
@@ -558,6 +585,34 @@ vger digest --playlist PLj6h78yzYM2P... --ai --output kubecon2024.md
 # 6. Drill into a specific talk
 vger ask https://www.youtube.com/watch?v=TALK_ID \
   "What was shown in the live demo?"
+```
+
+---
+
+### Cross-playlist / cross-event search
+
+Scan multiple editions of a conference and search across all of them at once.
+V'Ger records the playlist title as an event tag on every video it scans.
+
+```bash
+# Scan multiple KubeCon editions
+vger scan --playlist PLj6h78yzYM2N...  # KubeCon EU 2025
+vger scan --playlist PLj6h78yzYM2P...  # KubeCon NA 2024
+
+# Browse everything you have scanned (no YouTube API call)
+vger list --cached
+
+# All KubeCon talks (matches playlist title)
+vger list --cached --tags kubecon
+
+# eBPF talks from any scanned playlist
+vger list --cached --tags ebpf
+
+# eBPF talks specifically from KubeCon
+vger list --cached --tags kubecon --search ebpf
+
+# Find talks on Cilium across any event
+vger list --cached --tags cilium
 ```
 
 ---
