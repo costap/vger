@@ -12,7 +12,9 @@ import (
 
 // Ask answers a follow-up question about a previously analysed video.
 // It uses the cached report as text context — no video re-upload is performed.
-func (c *Client) Ask(ctx context.Context, question string, cached *domain.CachedAnalysis) (string, error) {
+// userContext is an optional description of the user's tech stack/environment;
+// when non-empty it is prepended to the prompt to tailor the answer.
+func (c *Client) Ask(ctx context.Context, question string, cached *domain.CachedAnalysis, userContext string) (string, error) {
 	if question == "" {
 		return "", fmt.Errorf("question must not be empty")
 	}
@@ -28,7 +30,7 @@ func (c *Client) Ask(ctx context.Context, question string, cached *domain.Cached
 		return "", fmt.Errorf("create gemini client: %w", err)
 	}
 
-	prompt := buildQAPrompt(question, cached)
+	prompt := buildQAPrompt(question, cached, userContext)
 
 	contents := []*genai.Content{
 		{
@@ -50,7 +52,7 @@ func (c *Client) Ask(ctx context.Context, question string, cached *domain.Cached
 }
 
 // buildQAPrompt constructs the text-only context prompt for a follow-up question.
-func buildQAPrompt(question string, cached *domain.CachedAnalysis) string {
+func buildQAPrompt(question string, cached *domain.CachedAnalysis, userContext string) string {
 	r := &cached.Report
 	m := &cached.Metadata
 
@@ -68,7 +70,12 @@ func buildQAPrompt(question string, cached *domain.CachedAnalysis) string {
 		notesSection = fmt.Sprintf("\nDetailed notes (everything mentioned in the video):\n%s\n", r.Notes)
 	}
 
-	return fmt.Sprintf(`You are an expert in cloud-native technology. You previously analysed a conference talk video. Use only the context below to answer the user's question concisely and accurately.
+	userContextSection := ""
+	if strings.TrimSpace(userContext) != "" {
+		userContextSection = fmt.Sprintf("\n--- USER CONTEXT ---\n%s\n--- END USER CONTEXT ---\n", strings.TrimSpace(userContext))
+	}
+
+	return fmt.Sprintf(`You are an expert in cloud-native technology. You previously analysed a conference talk video. Use only the context below to answer the user's question concisely and accurately.%s
 
 --- VIDEO CONTEXT ---
 Title:    %s
@@ -84,6 +91,7 @@ Technologies identified:
 --- END CONTEXT ---
 
 Question: %s`,
+		userContextSection,
 		m.Title,
 		m.ChannelName,
 		formatDurationQA(m.DurationSec),
@@ -116,7 +124,8 @@ func formatDurationQA(secs int) string {
 // AskDeep answers a question about a video by re-submitting the YouTube URL
 // to Gemini as a FileData part, giving the model direct access to the full
 // video content. This is more expensive than Ask but can answer anything.
-func (c *Client) AskDeep(ctx context.Context, question string, videoURL string, cached *domain.CachedAnalysis) (string, error) {
+// userContext is injected into the prompt when non-empty.
+func (c *Client) AskDeep(ctx context.Context, question string, videoURL string, cached *domain.CachedAnalysis, userContext string) (string, error) {
 	if question == "" {
 		return "", fmt.Errorf("question must not be empty")
 	}
@@ -137,9 +146,14 @@ func (c *Client) AskDeep(ctx context.Context, question string, videoURL string, 
 		titleHint = fmt.Sprintf("Video title: %s\n", cached.Report.VideoTitle)
 	}
 
-	prompt := fmt.Sprintf(`You are an expert in cloud-native technology. Watch the video and answer the following question directly and concisely. Base your answer on what is actually said or shown in the video.
+	userContextSection := ""
+	if strings.TrimSpace(userContext) != "" {
+		userContextSection = fmt.Sprintf("\nUSER CONTEXT:\n%s\n\n", strings.TrimSpace(userContext))
+	}
 
-%sQuestion: %s`, titleHint, question)
+	prompt := fmt.Sprintf(`You are an expert in cloud-native technology. Watch the video and answer the following question directly and concisely. Base your answer on what is actually said or shown in the video.
+%s
+%sQuestion: %s`, userContextSection, titleHint, question)
 
 	contents := []*genai.Content{
 		{

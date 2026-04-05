@@ -81,7 +81,7 @@ Examples:
 					continue
 				}
 				fmt.Printf("  %s %s\n", ui.DimStyle().Render("enriching:"), sig.Title)
-				enrichment, err := gmClient.EnrichSignal(cmd.Context(), sig)
+				enrichment, err := gmClient.EnrichSignal(cmd.Context(), sig, loadUserContext())
 				if err != nil {
 					ui.RedAlert(fmt.Errorf("enrich %s: %w", sig.ID, err))
 					return err

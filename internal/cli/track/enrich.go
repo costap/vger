@@ -54,7 +54,8 @@ Example:
 
 		gmClient := gemini.New(key, model(cmd))
 
-		if err := enrichSignalAndSave(cmd.Context(), gmClient, store, sig); err != nil {
+		uc := loadUserContext()
+		if err := enrichSignalAndSave(cmd.Context(), gmClient, store, sig, uc); err != nil {
 			ui.RedAlert(err)
 			return err
 		}
@@ -66,11 +67,11 @@ Example:
 
 // enrichSignalAndSave calls Gemini to enrich sig, saves it, and prints the enrichment section.
 // Shared by enrichCmd and addCmd (--enrich flag).
-func enrichSignalAndSave(ctx context.Context, gmClient *gemini.Client, store domain.SignalStore, sig *domain.Signal) error {
+func enrichSignalAndSave(ctx context.Context, gmClient *gemini.Client, store domain.SignalStore, sig *domain.Signal, userContext string) error {
 	ui.Field("Enriching", sig.ID+" — "+sig.Title)
 	fmt.Println(ui.DimStyle().Render("  calling Gemini…"))
 
-	enrichment, err := gmClient.EnrichSignal(ctx, sig)
+	enrichment, err := gmClient.EnrichSignal(ctx, sig, userContext)
 	if err != nil {
 		return err
 	}

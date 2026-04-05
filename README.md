@@ -32,11 +32,12 @@ cloud-native knowledge, and returns it to you in a form you can act on.
 - Fetch video metadata from the YouTube Data API
 - Browse channel video catalogues and playlists, search across complete upload history
 - Submit individual videos or entire playlists to **Gemini 2.5 Flash** for multimodal analysis
-- Extract a structured summary and a technology radar with CNCF project context
+- Extract a structured summary, speaker/presenter list, and a technology radar with CNCF project context
 - Cache all analysis locally so follow-up questions are instant and free
 - Answer follow-up questions from cached context — or re-submit the video for deep analysis
 - Generate playlist digests: technology radar across all talks, AI-synthesised learning paths
 - **Track technology signals** as you discover them — capture, AI-enrich, and synthesise your backlog into actionable digests; optionally backed by a git repo for version-controlled signal history
+- **Persistent user context** — tell V'Ger about your stack once; all Gemini answers are automatically tailored to your environment
 
 ---
 
@@ -153,6 +154,7 @@ vger scan --playlist PLj6h78yzYM2P... --refresh
 
 **Output includes:**
 - Video title, channel, duration, and stardate
+- Speakers / presenters detected from the video (name and affiliation)
 - 3–5 sentence technical summary
 - Technology radar: each identified project with description, CNCF stage, why it matters, and where to learn more
 
@@ -164,9 +166,12 @@ Re-run after an interruption and V'Ger picks up where it left off.
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--playlist` | — | Playlist ID or URL — scan all videos in the playlist |
-| `--concurrency` | `3` | Number of parallel analyses in playlist mode |
+| `--concurrency` | `1` | Number of parallel analyses in playlist mode |
 | `--refresh` | `false` | Force re-analysis even if a cached result exists |
 | `--model` | `gemini-2.5-flash` | Override the Gemini model |
+
+> **Note on concurrency:** the default of `1` avoids Gemini token quota errors on Tier 1 (1M tokens/min).
+> Raise it on a paid tier with higher quota.
 
 ---
 
@@ -242,8 +247,9 @@ vger list --cached --tags kubecon --search ebpf
 | `--cached` | `false` | Browse all locally cached videos without any YouTube API call |
 | `--max` | `50` | Maximum number of results |
 
-> **Tag filtering** matches against both technology names extracted by Gemini (e.g. `--tags cilium`)
-> and playlist titles set when scanning (e.g. `--tags kubecon`, `--tags "eu 2025"`).
+> **Tag filtering** matches against technology names extracted by Gemini (e.g. `--tags cilium`),
+> playlist titles set when scanning (e.g. `--tags kubecon`, `--tags "eu 2025"`),
+> and **speaker names** detected from the video (e.g. `--tags "jessie frazelle"`).
 > Only cached videos can match tag filters — uncached videos show a dim `·` indicator.
 
 ---
@@ -449,6 +455,9 @@ vger track add
 # AI-assisted — describe it in natural language; Gemini extracts the fields
 vger track add --ai "saw a KubeCon talk on HolmesGPT for AI-driven k8s remediation https://..."
 
+# AI-assisted + enrich in one step — no second command needed
+vger track add --ai "..." --enrich
+
 # AI-assisted + open $EDITOR for review (default when TECHDR_DIR is set)
 vger track add --ai "..." --edit
 ```
@@ -456,6 +465,7 @@ vger track add --ai "..." --edit
 | Flag | Description |
 |------|-------------|
 | `--ai <text>` | Free-text description; Gemini extracts all signal fields |
+| `--enrich` | AI-enrich the signal immediately after capture |
 | `--edit` | Open `$VISUAL`/`$EDITOR` after capture for manual review |
 
 #### `track list` — Browse your backlog
@@ -540,18 +550,53 @@ vger track digest --category security
 
 ---
 
+### `vger config` — Persistent user context
+
+Tell V'Ger about your environment once. The context is stored in `~/.vger/config.yaml`
+and automatically injected into every Gemini prompt — `ask`, `research`, `digest`,
+`track enrich`, and `track digest`. This makes all recommendations and answers
+tailored to your actual stack without repeating yourself.
+
+```bash
+# Set your context (update anytime)
+vger config set user_context "We run AWS EKS 1.29 with Cilium CNI, Istio service mesh,
+Go microservices, GitOps with Flux, and Prometheus/Grafana for observability."
+
+# View current config
+vger config show
+
+# Clear the context
+vger config clear user_context
+```
+
+**Supported fields:**
+
+| Field | Description |
+|-------|-------------|
+| `user_context` | Free-text description of your team's stack, cloud provider, scale, goals, and constraints |
+
+> **Tip:** The more specific you are, the better. Include your cloud provider, Kubernetes version,
+> networking stack, observability tools, languages, and any hard constraints (e.g. "no vendor lock-in",
+> "FIPS compliance required"). V'Ger uses this to focus `stack_fit` assessments and `next_steps`
+> on what's actually relevant to you.
+
+---
+
 ## TYPICAL WORKFLOW
 
 ### Single video
 
 ```bash
+# 0. Tell V'Ger about your environment (once — persists across sessions)
+vger config set user_context "We run AWS EKS 1.29, Cilium CNI, Go microservices."
+
 # 1. Find talks you want to analyse
 vger list --channel @cncf --search "kubecon 2024" --max 20
 
 # 2. Scan a talk — Gemini analyses the full video
 vger scan https://www.youtube.com/watch?v=TALK_ID
 
-# 3. Ask follow-up questions from the cache (instant)
+# 3. Ask follow-up questions from the cache (instant, context-aware)
 vger ask https://www.youtube.com/watch?v=TALK_ID \
   "Which technologies are worth prioritising for my platform team?"
 
@@ -644,8 +689,8 @@ Capture technologies as you encounter them — blog posts, talks, colleague reco
 Enrich them later and synthesise your backlog when it's time to prioritise.
 
 ```bash
-# 1. Quick capture from a tweet or article (AI extracts the fields)
-vger track add --ai "read a blog post about HolmesGPT for AI-driven k8s remediation https://..."
+# 1. Quick capture from a tweet or article (AI extracts the fields + enrich in one step)
+vger track add --ai "read a blog post about HolmesGPT for AI-driven k8s remediation https://..." --enrich
 
 # 2. Browse your backlog
 vger track list --status spotted
@@ -653,7 +698,7 @@ vger track list --status spotted
 # 3. Review a signal in detail
 vger track show 0001
 
-# 4. AI-enrich it with context, alternatives, and stack fit
+# 4. AI-enrich it (if not done at capture time)
 vger track enrich 0001
 
 # 5. Link it to a conference talk you scanned
@@ -758,6 +803,7 @@ internal/
     gemini/        — Gemini multimodal analyser, Q&A, and signal AI (enrich/add)
     genkit/        — Genkit flows for typed structured output (track digest)
     cache/         — local JSON file cache (~/.vger/cache/)
+    config/        — user config (~/.vger/config.yaml): persistent user context
     signals/       — signal store adapters: JSONStore + MarkdownStore (tech-signals)
   cli/             — Cobra commands with LCARS terminal styling
 docs/              — architecture options, dataflow diagrams, technical spec
@@ -811,6 +857,7 @@ The built-in `GITHUB_TOKEN` is used automatically for creating the release itsel
 | 1262.5 | YouTube Data API and Gemini multimodal integration |
 | 1262.6 | Channel listing, analysis caching, follow-up Q&A |
 | 1262.7 | `vger track` — technology signal tracking with AI enrichment, Genkit digest, and Markdown/git store integration |
+| 1262.8 | Speaker/presenter detection, `vger config` persistent user context, `track add --enrich` one-step capture |
 
 ---
 

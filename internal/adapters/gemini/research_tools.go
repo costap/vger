@@ -130,7 +130,7 @@ func (t *researchToolSet) executeAskVideo(ctx context.Context, fc *genai.Functio
 		return map[string]any{"error": fmt.Sprintf("video %q not found in cache", videoID)}
 	}
 
-	answer, err := t.geminiClient.Ask(ctx, question, cached)
+	answer, err := t.geminiClient.Ask(ctx, question, cached, "")
 	if err != nil {
 		return map[string]any{"error": fmt.Sprintf("ask failed: %s", err.Error())}
 	}

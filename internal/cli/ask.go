@@ -107,10 +107,10 @@ The video must have been scanned with 'vger scan' at least once.`,
 
 		if askDeep {
 			ui.Status(fmt.Sprintf("Deep mode%s: re-transmitting video to Gemini for direct analysis...", lensLabel))
-			answer, err = gmClient.AskDeep(cmd.Context(), question, url, cached)
+			answer, err = gmClient.AskDeep(cmd.Context(), question, url, cached, userContext)
 		} else {
 			ui.Status(fmt.Sprintf("Transmitting question to Gemini knowledge core%s...", lensLabel))
-			answer, err = gmClient.Ask(cmd.Context(), question, cached)
+			answer, err = gmClient.Ask(cmd.Context(), question, cached, userContext)
 		}
 
 		if err != nil {

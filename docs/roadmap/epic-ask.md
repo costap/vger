@@ -73,17 +73,18 @@ Covers improvements to how users query analysed content — single video, multi-
 
 ---
 
-### · Context injection — team/stack context
-**Priority:** Unscheduled · Effort: M
+### ✅ Context injection — team/stack context
+**Priority:** ~~Unscheduled~~ · **Status: DONE** · Effort: M
 
 **As a** user with a specific tech stack,  
 **I want** vger to always be aware of my context (e.g. "we run on AWS EKS with Istio"),  
 **so that** ask and research answers are tailored to my environment.
 
 **Acceptance criteria:**
-- `~/.vger/config.yaml` supports `user_context: |` multiline string
-- Context prepended to all Gemini prompts (ask, research, digest)
-- `vger config set user_context "..."` command to set it
+- ✅ `~/.vger/config.yaml` supports `user_context` string
+- ✅ Context injected into all Gemini prompts (ask, ask --deep, research, digest, track enrich, track digest)
+- ✅ `vger config set user_context "..."` command to set it
+- ✅ `vger config show` and `vger config clear user_context` subcommands
 
 ---
 

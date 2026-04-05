@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/costap/vger/internal/adapters/config"
 	"github.com/costap/vger/internal/adapters/signals"
 	"github.com/costap/vger/internal/domain"
 	"github.com/spf13/cobra"
@@ -85,4 +86,12 @@ func geminiKey(c *cobra.Command) string {
 func model(c *cobra.Command) string {
 	m, _ := c.Root().PersistentFlags().GetString("model")
 	return m
+}
+
+// loadUserContext reads user context from ~/.vger/config.yaml (best-effort).
+func loadUserContext() string {
+	if cfg, err := config.Load(); err == nil {
+		return cfg.UserContext
+	}
+	return ""
 }

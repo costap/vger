@@ -104,7 +104,7 @@ Examples:
 		if digestAI {
 			ui.Status("Transmitting summaries to Gemini synthesis array...")
 			gmClient := gemini.New(geminiAPIKey, geminiModel)
-			digest, err = gmClient.Synthesise(cmd.Context(), entries)
+			digest, err = gmClient.Synthesise(cmd.Context(), entries, userContext)
 			if err != nil {
 				ui.RedAlert(err)
 				return err
