@@ -85,6 +85,15 @@ func scoreEntry(entry *domain.CachedAnalysis, q string) int {
 			score += 2
 		}
 	}
+	if strings.Contains(strings.ToLower(entry.Metadata.Title), q) {
+		score += 2
+	}
+	for _, p := range entry.Playlists {
+		if strings.Contains(strings.ToLower(p.PlaylistTitle), q) {
+			score += 2
+			break // count once even if multiple playlists match
+		}
+	}
 	if strings.Contains(strings.ToLower(entry.Report.Summary), q) {
 		score += 2
 	}

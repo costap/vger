@@ -126,6 +126,13 @@ func runPlaylistScan(cmd *cobra.Command) error {
 
 	ui.Status(fmt.Sprintf("Fetching playlist: %s", playlistID))
 
+	// Resolve the human-readable playlist title for event tagging.
+	playlistTitle, err := ytClient.GetPlaylistTitle(cmd.Context(), playlistID)
+	if err != nil {
+		ui.Status(fmt.Sprintf("(could not resolve playlist title: %v)", err))
+		playlistTitle = playlistID
+	}
+
 	videos, _, err := ytClient.ListPlaylistVideos(cmd.Context(), playlistID, "", 1000)
 	if err != nil {
 		ui.RedAlert(err)
@@ -140,7 +147,13 @@ func runPlaylistScan(cmd *cobra.Command) error {
 	c := cache.New(cacheDir)
 
 	total := len(videos)
-	ui.Status(fmt.Sprintf("Playlist: %s  |  %d videos  |  concurrency: %d", playlistID, total, scanConcurrency))
+	ui.Status(fmt.Sprintf("Playlist: %s  |  %d videos  |  concurrency: %d", playlistTitle, total, scanConcurrency))
+
+	membership := domain.PlaylistMembership{
+		PlaylistID:    playlistID,
+		PlaylistTitle: playlistTitle,
+		AddedAt:       time.Now(),
+	}
 
 	var (
 		scanned  atomic.Int64
@@ -157,10 +170,15 @@ func runPlaylistScan(cmd *cobra.Command) error {
 		videoID := v.VideoID
 		title := v.Title
 
-		// Check cache before spinning up a goroutine
+		// Check cache before spinning up a goroutine.
 		if !scanRefresh {
 			cached, err := c.Load(cmd.Context(), videoID)
 			if err == nil && cached != nil {
+				// Record this playlist on the existing entry if not already present.
+				if !cached.HasPlaylist(playlistID) {
+					cached.Playlists = append(cached.Playlists, membership)
+					_ = c.Save(cmd.Context(), cached) // best-effort
+				}
 				mu.Lock()
 				ui.Status(fmt.Sprintf("[%*d/%d] Cached:   %s", len(fmt.Sprintf("%d", total)), idx, total, truncate(title, 60)))
 				mu.Unlock()
@@ -190,9 +208,10 @@ func runPlaylistScan(cmd *cobra.Command) error {
 
 			report.Stardate = ui.Stardate()
 			entry := &domain.CachedAnalysis{
-				VideoID:  videoID,
-				CachedAt: time.Now(),
-				Report:   *report,
+				VideoID:   videoID,
+				CachedAt:  time.Now(),
+				Report:    *report,
+				Playlists: []domain.PlaylistMembership{membership},
 			}
 			if meta != nil {
 				entry.Metadata = *meta
