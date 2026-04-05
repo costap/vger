@@ -136,6 +136,8 @@ func (c *Client) AnalyseVideo(ctx context.Context, url string, meta *domain.Vide
 }
 
 // analyseSingleShot performs a single GenerateContent call with JSON MIME type enforcement.
+// Both the API call and JSON parsing are wrapped in withRetry so that truncated or
+// malformed responses (common when the API is under load) are retried automatically.
 func (c *Client) analyseSingleShot(
 	ctx context.Context,
 	client *genai.Client,
@@ -146,11 +148,20 @@ func (c *Client) analyseSingleShot(
 	config := &genai.GenerateContentConfig{
 		ResponseMIMEType: "application/json",
 	}
-	resp, err := client.Models.GenerateContent(ctx, c.Model, contents, config)
+	var report *domain.Report
+	err := withRetry(ctx, 5, func() error {
+		resp, callErr := client.Models.GenerateContent(ctx, c.Model, contents, config)
+		if callErr != nil {
+			return callErr
+		}
+		var parseErr error
+		report, parseErr = parseReport(resp.Text(), meta, url)
+		return parseErr
+	})
 	if err != nil {
 		return nil, fmt.Errorf("gemini generate content: %w", err)
 	}
-	return parseReport(resp.Text(), meta, url)
+	return report, nil
 }
 
 // analyseWithTools runs a multi-turn function-calling loop, executing Gemini tool
@@ -170,15 +181,31 @@ func (c *Client) analyseWithTools(
 	}
 
 	for round := 0; round < maxToolRounds; round++ {
-		resp, err := client.Models.GenerateContent(ctx, c.Model, contents, config)
+		var resp *genai.GenerateContentResponse
+		var fcs []*genai.FunctionCall
+		var report *domain.Report
+
+		err := withRetry(ctx, 5, func() error {
+			var callErr error
+			resp, callErr = client.Models.GenerateContent(ctx, c.Model, contents, config)
+			if callErr != nil {
+				return callErr
+			}
+			fcs = resp.FunctionCalls()
+			if len(fcs) == 0 {
+				// Final answer round — parse inside the retry so truncated JSON is retried.
+				var parseErr error
+				report, parseErr = parseReport(resp.Text(), meta, url)
+				return parseErr
+			}
+			return nil
+		})
 		if err != nil {
 			return nil, fmt.Errorf("gemini generate content (round %d): %w", round+1, err)
 		}
 
-		fcs := resp.FunctionCalls()
 		if len(fcs) == 0 {
-			// No more tool calls — the model has produced its final answer.
-			return parseReport(resp.Text(), meta, url)
+			return report, nil
 		}
 
 		// Append the model's message to the conversation.

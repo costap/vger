@@ -39,7 +39,7 @@ var scanCmd = &cobra.Command{
 func init() {
 	scanCmd.Flags().BoolVar(&scanRefresh, "refresh", false, "Re-analyse even if a cached result exists")
 	scanCmd.Flags().StringVar(&scanPlaylist, "playlist", "", "Playlist ID or URL — scan all videos in the playlist")
-	scanCmd.Flags().IntVar(&scanConcurrency, "concurrency", 3, "Number of videos to analyse in parallel (playlist mode)")
+	scanCmd.Flags().IntVar(&scanConcurrency, "concurrency", 1, "Number of videos to analyse in parallel (playlist mode); lower values reduce Gemini API demand")
 }
 
 // runSingleScan analyses a single video URL.
@@ -236,7 +236,7 @@ func runPlaylistScan(cmd *cobra.Command) error {
 	fmt.Println()
 
 	if failed.Load() > 0 {
-		return fmt.Errorf("%d video(s) failed to analyse", failed.Load())
+		return fmt.Errorf("%d video(s) failed to analyse — re-run the same command to retry (cached videos are skipped automatically)", failed.Load())
 	}
 	return nil
 }
