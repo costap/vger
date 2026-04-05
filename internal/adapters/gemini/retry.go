@@ -95,7 +95,7 @@ func isRetryable(err error) bool {
 		return true
 	}
 	switch st.Code() {
-	case codes.Unavailable,      // 503 — service temporarily unavailable / high demand
+	case codes.Unavailable, // 503 — service temporarily unavailable / high demand
 		codes.ResourceExhausted, // 429 — token quota exceeded; backoff and retry
 		codes.DeadlineExceeded,  // timeout on the server side
 		codes.Aborted:           // transient conflict; safe to retry
@@ -104,4 +104,3 @@ func isRetryable(err error) bool {
 		return false
 	}
 }
-

@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var listStatus   string
+var listStatus string
 var listCategory string
 
 var listCmd = &cobra.Command{

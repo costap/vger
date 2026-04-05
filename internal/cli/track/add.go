@@ -17,6 +17,7 @@ import (
 
 var addAIPrompt string
 var addEdit bool
+var addEnrich bool
 
 var addCmd = &cobra.Command{
 	Use:   "add",
@@ -127,6 +128,22 @@ Examples:
 			ui.Field("Tags", strings.Join(sig.Tags, ", "))
 		}
 		ui.Complete(fmt.Sprintf("signal %s captured", sig.ID))
+
+		if addEnrich {
+			key := geminiKey(cmd)
+			if key == "" {
+				err := fmt.Errorf("GEMINI_API_KEY is required for --enrich — set it as an env var or pass --gemini-key")
+				ui.RedAlert(err)
+				return err
+			}
+			gmClient := gemini.New(key, model(cmd))
+			if err := enrichSignalAndSave(cmd.Context(), gmClient, store, sig); err != nil {
+				ui.RedAlert(err)
+				return err
+			}
+			ui.Complete("enrichment saved")
+		}
+
 		return nil
 	},
 }
@@ -134,6 +151,7 @@ Examples:
 func init() {
 	addCmd.Flags().StringVar(&addAIPrompt, "ai", "", "Describe the signal in natural language; Gemini extracts the fields")
 	addCmd.Flags().BoolVar(&addEdit, "edit", false, "Open $EDITOR after capture for review (default true with --ai when TECHDR_DIR is set)")
+	addCmd.Flags().BoolVar(&addEnrich, "enrich", false, "Run AI enrichment immediately after capturing the signal")
 }
 
 // openInEditor opens the given file path in $VISUAL or $EDITOR.

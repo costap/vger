@@ -1,11 +1,13 @@
 package track
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/costap/vger/internal/adapters/gemini"
 	"github.com/costap/vger/internal/cli/ui"
+	"github.com/costap/vger/internal/domain"
 	"github.com/spf13/cobra"
 )
 
@@ -52,47 +54,56 @@ Example:
 
 		gmClient := gemini.New(key, model(cmd))
 
-		ui.Field("Enriching", sig.ID+" — "+sig.Title)
-		fmt.Println(ui.DimStyle().Render("  calling Gemini…"))
-
-		enrichment, err := gmClient.EnrichSignal(cmd.Context(), sig)
-		if err != nil {
+		if err := enrichSignalAndSave(cmd.Context(), gmClient, store, sig); err != nil {
 			ui.RedAlert(err)
 			return err
-		}
-
-		sig.Enrichment = enrichment
-		sig.UpdatedAt = time.Now().UTC()
-
-		if err := store.Save(cmd.Context(), sig); err != nil {
-			ui.RedAlert(err)
-			return err
-		}
-
-		dimSty := ui.DimStyle()
-		labelSty := ui.LabelStyle()
-
-		fmt.Println()
-		ui.SectionHeader("ai enrichment")
-		fmt.Printf("  %s\n  %s\n\n", labelSty.Render("WHAT IT IS"), dimSty.Render(enrichment.WhatItIs))
-		fmt.Printf("  %s\n  %s\n\n", labelSty.Render("MATURITY & RISK"), dimSty.Render(enrichment.Maturity))
-		if len(enrichment.Alternatives) > 0 {
-			fmt.Printf("  %s\n", labelSty.Render("ALTERNATIVES"))
-			for _, a := range enrichment.Alternatives {
-				fmt.Printf("    %s\n", dimSty.Render("• "+a))
-			}
-			fmt.Println()
-		}
-		fmt.Printf("  %s\n  %s\n\n", labelSty.Render("STACK FIT"), dimSty.Render(enrichment.StackFit))
-		if len(enrichment.NextSteps) > 0 {
-			fmt.Printf("  %s\n", labelSty.Render("NEXT STEPS"))
-			for _, s := range enrichment.NextSteps {
-				fmt.Printf("    %s\n", dimSty.Render("☐ "+s))
-			}
-			fmt.Println()
 		}
 
 		ui.Complete("enrichment saved")
 		return nil
 	},
+}
+
+// enrichSignalAndSave calls Gemini to enrich sig, saves it, and prints the enrichment section.
+// Shared by enrichCmd and addCmd (--enrich flag).
+func enrichSignalAndSave(ctx context.Context, gmClient *gemini.Client, store domain.SignalStore, sig *domain.Signal) error {
+	ui.Field("Enriching", sig.ID+" — "+sig.Title)
+	fmt.Println(ui.DimStyle().Render("  calling Gemini…"))
+
+	enrichment, err := gmClient.EnrichSignal(ctx, sig)
+	if err != nil {
+		return err
+	}
+
+	sig.Enrichment = enrichment
+	sig.UpdatedAt = time.Now().UTC()
+
+	if err := store.Save(ctx, sig); err != nil {
+		return err
+	}
+
+	dimSty := ui.DimStyle()
+	labelSty := ui.LabelStyle()
+
+	fmt.Println()
+	ui.SectionHeader("ai enrichment")
+	fmt.Printf("  %s\n  %s\n\n", labelSty.Render("WHAT IT IS"), dimSty.Render(enrichment.WhatItIs))
+	fmt.Printf("  %s\n  %s\n\n", labelSty.Render("MATURITY & RISK"), dimSty.Render(enrichment.Maturity))
+	if len(enrichment.Alternatives) > 0 {
+		fmt.Printf("  %s\n", labelSty.Render("ALTERNATIVES"))
+		for _, a := range enrichment.Alternatives {
+			fmt.Printf("    %s\n", dimSty.Render("• "+a))
+		}
+		fmt.Println()
+	}
+	fmt.Printf("  %s\n  %s\n\n", labelSty.Render("STACK FIT"), dimSty.Render(enrichment.StackFit))
+	if len(enrichment.NextSteps) > 0 {
+		fmt.Printf("  %s\n", labelSty.Render("NEXT STEPS"))
+		for _, s := range enrichment.NextSteps {
+			fmt.Printf("    %s\n", dimSty.Render("☐ "+s))
+		}
+		fmt.Println()
+	}
+
+	return nil
 }
