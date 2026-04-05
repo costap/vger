@@ -168,7 +168,7 @@ func runResearch(cmd *cobra.Command, args []string) error {
 		lc = &gemini.LensContext{RoleContext: lens.RoleContext}
 	}
 
-	report, err := gmClient.ResearchSynthesize(ctx, topic, hits, projects, matchedSignals, discoveredTalks, lc, researchMaxDepth, cacheClient)
+	report, err := gmClient.ResearchSynthesize(ctx, topic, hits, projects, matchedSignals, discoveredTalks, lc, researchMaxDepth, cacheClient, userContext)
 	if err != nil {
 		ui.RedAlert(err)
 		return err

@@ -3,6 +3,7 @@ package cli
 import (
 	"os"
 
+	"github.com/costap/vger/internal/adapters/config"
 	"github.com/costap/vger/internal/cli/track"
 	"github.com/costap/vger/internal/cli/ui"
 	"github.com/spf13/cobra"
@@ -11,6 +12,7 @@ import (
 var geminiAPIKey string
 var youtubeAPIKey string
 var geminiModel string
+var userContext string // loaded from ~/.vger/config.yaml at startup
 
 // Root is the top-level cobra command.
 var Root = &cobra.Command{
@@ -35,6 +37,10 @@ and produces structured summaries with technology learning recommendations.`,
 		if youtubeAPIKey == "" {
 			youtubeAPIKey = os.Getenv("YOUTUBE_API_KEY")
 		}
+		// Load user context from config (best-effort; missing config is fine).
+		if cfg, err := config.Load(); err == nil {
+			userContext = cfg.UserContext
+		}
 		ui.Header()
 	},
 }
@@ -49,5 +55,6 @@ func init() {
 	Root.AddCommand(askCmd)
 	Root.AddCommand(digestCmd)
 	Root.AddCommand(researchCmd)
+	Root.AddCommand(configCmd)
 	Root.AddCommand(track.Cmd())
 }

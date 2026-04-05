@@ -40,7 +40,9 @@ type enrichSignalResponse struct {
 
 // EnrichSignal calls Gemini to generate AI context for an existing signal.
 // It fills WhatItIs, Maturity, Alternatives, StackFit, and NextSteps.
-func (c *Client) EnrichSignal(ctx context.Context, sig *domain.Signal) (*domain.SignalEnrichment, error) {
+// userContext is injected into the prompt when non-empty so that StackFit
+// and NextSteps are tailored to the user's actual environment.
+func (c *Client) EnrichSignal(ctx context.Context, sig *domain.Signal, userContext string) (*domain.SignalEnrichment, error) {
 	gc, err := genai.NewClient(ctx, &genai.ClientConfig{
 		APIKey:  c.APIKey,
 		Backend: genai.BackendGeminiAPI,
@@ -63,6 +65,9 @@ func (c *Client) EnrichSignal(ctx context.Context, sig *domain.Signal) (*domain.
 	}
 	if sig.Note != "" {
 		sb.WriteString(fmt.Sprintf("Why captured: %s\n", sig.Note))
+	}
+	if strings.TrimSpace(userContext) != "" {
+		sb.WriteString(fmt.Sprintf("\nUSER CONTEXT (tailor stack_fit and next_steps to this environment):\n%s\n", strings.TrimSpace(userContext)))
 	}
 
 	resp, err := gc.Models.GenerateContent(ctx, c.Model,

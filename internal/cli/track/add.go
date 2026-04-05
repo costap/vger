@@ -137,7 +137,7 @@ Examples:
 				return err
 			}
 			gmClient := gemini.New(key, model(cmd))
-			if err := enrichSignalAndSave(cmd.Context(), gmClient, store, sig); err != nil {
+			if err := enrichSignalAndSave(cmd.Context(), gmClient, store, sig, loadUserContext()); err != nil {
 				ui.RedAlert(err)
 				return err
 			}

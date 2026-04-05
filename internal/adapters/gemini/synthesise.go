@@ -49,8 +49,8 @@ type priorityTalkResp struct {
 
 // Synthesise takes a slice of cached analyses and asks Gemini to produce a
 // cross-playlist digest: overarching theme, recommended learning path, and
-// priority talks to watch first.
-func (c *Client) Synthesise(ctx context.Context, entries []*domain.CachedAnalysis) (*domain.DigestReport, error) {
+// priority talks to watch first. userContext is injected when non-empty.
+func (c *Client) Synthesise(ctx context.Context, entries []*domain.CachedAnalysis, userContext string) (*domain.DigestReport, error) {
 	gc, err := genai.NewClient(ctx, &genai.ClientConfig{
 		APIKey:  c.APIKey,
 		Backend: genai.BackendGeminiAPI,
@@ -60,6 +60,9 @@ func (c *Client) Synthesise(ctx context.Context, entries []*domain.CachedAnalysi
 	}
 
 	var sb strings.Builder
+	if strings.TrimSpace(userContext) != "" {
+		sb.WriteString(fmt.Sprintf("USER CONTEXT (tailor recommendations to this environment):\n%s\n\n", strings.TrimSpace(userContext)))
+	}
 	sb.WriteString("PLAYLIST TALKS:\n\n")
 	for i, e := range entries {
 		sb.WriteString(fmt.Sprintf("--- Talk %d ---\n", i+1))

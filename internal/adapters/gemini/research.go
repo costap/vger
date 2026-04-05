@@ -104,6 +104,7 @@ func (c *Client) ResearchSynthesize(
 	lens *LensContext,
 	maxDepth int,
 	cacheSearcher domain.CacheSearcher,
+	userContext string,
 ) (*domain.ResearchReport, error) {
 	gc, err := genai.NewClient(ctx, &genai.ClientConfig{
 		APIKey:  c.APIKey,
@@ -118,7 +119,7 @@ func (c *Client) ResearchSynthesize(
 		systemPrompt = lens.RoleContext + "\n\n" + researchSystemPrompt
 	}
 
-	prompt := buildResearchPrompt(topic, hits, projects, signals, talks)
+	prompt := buildResearchPrompt(topic, hits, projects, signals, talks, userContext)
 
 	// Phase 2: run investigation loop before synthesis.
 	if maxDepth > 0 {
@@ -259,9 +260,14 @@ func buildResearchPrompt(
 	projects []cncf.ProjectInfo,
 	signals []*domain.Signal,
 	talks []domain.VideoListing,
+	userContext string,
 ) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("TOPIC: %q\n\n", topic))
+
+	if strings.TrimSpace(userContext) != "" {
+		sb.WriteString(fmt.Sprintf("USER CONTEXT (tailor your answer to this environment):\n%s\n\n", strings.TrimSpace(userContext)))
+	}
 
 	// Evidence from scanned videos.
 	if len(hits) > 0 {
