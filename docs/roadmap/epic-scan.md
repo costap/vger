@@ -40,17 +40,19 @@ Covers all improvements to how vger ingests, processes, and pre-processes video 
 
 ---
 
-### · Speaker/presenter detection
-**Priority:** Unscheduled · Effort: S
+### ✅ Speaker/presenter detection
+**Priority:** ~~Unscheduled~~ · **Status: DONE** · Effort: S
 
 **As a** user reading a scan report,  
 **I want** speaker names extracted from video metadata,  
 **so that** I can filter and search by presenter.
 
 **Acceptance criteria:**
-- Speaker name(s) added to `domain.Report` type
-- Gemini prompt updated to extract speaker from title/description
-- Displayed in `vger ask` and `vger research` evidence output
+- ✅ Speaker name(s) added to `domain.Report` type
+- ✅ Gemini prompt updated to extract speaker from title/description (`"Name (Affiliation)"` format, deduplication)
+- ✅ Displayed in `vger scan` report, `vger list` chips, and `vger research` evidence output
+- ✅ `--tags` filtering matches speaker names
+- ✅ Cache search scores speaker names
 
 ---
 
