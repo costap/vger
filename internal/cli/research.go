@@ -19,6 +19,7 @@ import (
 
 var (
 	researchDiscover  bool
+	researchAnywhere  bool
 	researchChannel   string
 	researchLens      string
 	researchMaxVideos int
@@ -36,13 +37,16 @@ var researchLongDesc = `Research a technology topic by searching all available s
   • Local cache of previously scanned conference talks
   • CNCF landscape for related projects
   • Your tracked technology signals
-  • YouTube talks (optional, with --discover)
+  • YouTube talks (optional, with --discover or --anywhere)
 
 The findings are synthesised by Gemini into a structured research brief with
 a landscape map, evidence from cached videos, investigation paths, and a verdict.
 
 Use --lens to apply an analytical preset to the synthesis (architect, engineer,
 radar, brief). Use --discover to also search YouTube for unscanned relevant talks.
+
+Use --anywhere to search all of YouTube instead of a specific channel.
+Note: --anywhere uses the YouTube search.list API (100 quota units/call).
 
 Use --max-depth to enable Phase 2 investigation: Gemini will autonomously query
 cached videos and search for additional evidence before synthesising the report.
@@ -54,6 +58,7 @@ cached videos and search for additional evidence before synthesising the report.
 Examples:
   vger research "eBPF"
   vger research "multi-cluster networking" --discover
+  vger research "multi-cluster networking" --anywhere
   vger research "WASM in Kubernetes" --lens architect
   vger research "service mesh" --max-depth 5
   vger research "service mesh" --output service-mesh-brief.md`
@@ -106,23 +111,35 @@ func runResearch(cmd *cobra.Command, args []string) error {
 		matchedSignals, _ = sigStore.Search(ctx, topic)
 	}
 
-	// --- Phase 4: YouTube discovery (--discover) ---
+	// --- Phase 4: YouTube discovery (--discover / --anywhere) ---
 	var discoveredTalks []domain.VideoListing
-	if researchDiscover {
-		ui.Status(fmt.Sprintf("Discovering unscanned talks on %q…", topic))
+	if researchDiscover || researchAnywhere {
 		ytClient := youtube.New(youtubeAPIKey)
-		channelRef := researchChannel
-		channelID, channelName, err := ytClient.ResolveChannel(ctx, channelRef)
-		if err != nil {
-			ui.RedAlert(fmt.Errorf("resolve channel %q: %w", channelRef, err))
-			return err
+		var all []domain.VideoListing
+
+		if researchAnywhere {
+			ui.Status(fmt.Sprintf("Searching all of YouTube for %q… (uses search.list quota)", topic))
+			all, err = ytClient.SearchVideos(ctx, topic, 20)
+			if err != nil {
+				ui.RedAlert(err)
+				return err
+			}
+		} else {
+			ui.Status(fmt.Sprintf("Discovering unscanned talks on %q…", topic))
+			channelRef := researchChannel
+			channelID, channelName, err := ytClient.ResolveChannel(ctx, channelRef)
+			if err != nil {
+				ui.RedAlert(fmt.Errorf("resolve channel %q: %w", channelRef, err))
+				return err
+			}
+			saveChannelHistory(channelRef, channelID, channelName)
+			all, err = ytClient.ListVideos(ctx, channelID, topic, 20)
+			if err != nil {
+				ui.RedAlert(err)
+				return err
+			}
 		}
-		saveChannelHistory(channelRef, channelID, channelName)
-		all, err := ytClient.ListVideos(ctx, channelID, topic, 20)
-		if err != nil {
-			ui.RedAlert(err)
-			return err
-		}
+
 		// Exclude videos already in the local cache.
 		cachedIDs := make(map[string]bool, len(hits))
 		for _, h := range hits {
@@ -203,8 +220,9 @@ func resolveResearchSignalStore() (signalSearcher, error) {
 }
 
 func init() {
-	researchCmd.Flags().BoolVar(&researchDiscover, "discover", false, "Search YouTube for unscanned relevant talks")
-	researchCmd.Flags().StringVar(&researchChannel, "channel", "@cncf", "YouTube channel to search when --discover is used")
+	researchCmd.Flags().BoolVar(&researchDiscover, "discover", false, "Search YouTube for unscanned relevant talks (channel-restricted)")
+	researchCmd.Flags().BoolVar(&researchAnywhere, "anywhere", false, "Search all of YouTube (uses search.list; implies --discover; ignores --channel)")
+	researchCmd.Flags().StringVar(&researchChannel, "channel", "@cncf", "YouTube channel to search when --discover is used (ignored with --anywhere)")
 	researchCmd.Flags().StringVar(&researchLens, "lens", "", fmt.Sprintf("Apply a built-in analytical lens (%s)", lensNames()))
 	researchCmd.Flags().IntVar(&researchMaxVideos, "max-videos", 10, "Maximum cached videos to include in context")
 	researchCmd.Flags().IntVar(&researchMaxDepth, "max-depth", 0, "Investigation depth: 0=fast single-pass, 3=light, 5=standard, 8=deep (Phase 2)")
