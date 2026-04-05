@@ -15,6 +15,9 @@ import (
 // Scoring weights (case-insensitive substring matching):
 //   - Technology.Name exact match   → 3 pts each
 //   - Technology.Name contains query → 2 pts each
+//   - Metadata.Title contains query  → 2 pts
+//   - PlaylistTitle contains query   → 2 pts
+//   - Speaker name contains query    → 2 pts each
 //   - Report.Summary contains query  → 2 pts
 //   - Report.Notes contains query    → 1 pt
 func (c *JSONCache) Search(_ context.Context, query string, maxResults int) ([]*domain.CachedAnalysis, error) {
@@ -92,6 +95,11 @@ func scoreEntry(entry *domain.CachedAnalysis, q string) int {
 		if strings.Contains(strings.ToLower(p.PlaylistTitle), q) {
 			score += 2
 			break // count once even if multiple playlists match
+		}
+	}
+	for _, s := range entry.Report.Speakers {
+		if strings.Contains(strings.ToLower(s), q) {
+			score += 2
 		}
 	}
 	if strings.Contains(strings.ToLower(entry.Report.Summary), q) {

@@ -18,6 +18,7 @@ const systemPromptBase = `You are an expert in cloud-native technology, Kubernet
 You will be given a conference talk video. Analyse it and return a JSON object with exactly this schema:
 
 {
+  "speakers": ["<Full Name (Affiliation if known) — e.g. Jane Smith (Red Hat)>"],
   "summary": "<concise technical summary of the talk, 3-5 sentences>",
   "notes": "<detailed freeform narrative covering EVERYTHING mentioned in the video: all technologies and projects (even brief mentions), speaker names and affiliations, demo highlights, code or architecture details shown, audience Q&A moments, and any quotes worth preserving. Write this as a thorough paragraph or set of paragraphs — this will be used to answer follow-up questions so err on the side of completeness>",
   "technologies": [
@@ -32,7 +33,8 @@ You will be given a conference talk video. Analyse it and return a JSON object w
 }
 
 Return only the JSON object. Do not wrap it in markdown code fences. Do not add commentary outside the JSON.
-Focus the technologies list on projects that are novel or worth learning more about. The notes field should be exhaustive.`
+Focus the technologies list on projects that are novel or worth learning more about. The notes field should be exhaustive.
+For speakers: extract names from the video intro, title cards, and self-introductions. Include affiliation in parentheses where mentioned, e.g. "Jane Smith (Red Hat)". Each entry must be a person's name — do not add affiliations as separate entries.`
 
 const systemPromptToolSuffix = `
 
@@ -50,6 +52,7 @@ const maxToolRounds = 10
 
 // analysisResponse mirrors the JSON schema requested from the model.
 type analysisResponse struct {
+	Speakers     []string             `json:"speakers"`
 	Summary      string               `json:"summary"`
 	Notes        string               `json:"notes"`
 	Technologies []technologyResponse `json:"technologies"`
@@ -244,6 +247,7 @@ func parseReport(raw string, meta *domain.VideoMetadata, url string) (*domain.Re
 		VideoTitle:       meta.Title,
 		VideoURL:         url,
 		VideoDurationSec: meta.DurationSec,
+		Speakers:         deduplicateSpeakers(ar.Speakers),
 		Summary:          ar.Summary,
 		Notes:            ar.Notes,
 	}
@@ -285,4 +289,24 @@ func stripCodeFences(s string) string {
 		}
 	}
 	return s
+}
+
+// deduplicateSpeakers removes duplicate and blank entries from the speakers list,
+// using case-insensitive comparison. Preserves original casing of first occurrence.
+func deduplicateSpeakers(speakers []string) []string {
+	seen := make(map[string]struct{}, len(speakers))
+	out := make([]string, 0, len(speakers))
+	for _, s := range speakers {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		key := strings.ToLower(s)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, s)
+	}
+	return out
 }

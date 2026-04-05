@@ -278,7 +278,14 @@ func writeResearchMarkdown(r *domain.ResearchReport, path string) error {
 	if len(r.EvidenceVideos) > 0 {
 		sb.WriteString("## Evidence from Cache\n\n")
 		for i, e := range r.EvidenceVideos {
-			sb.WriteString(fmt.Sprintf("%d. **[%s](%s)** — %s\n", i+1, e.VideoTitle, e.VideoURL, e.Relevance))
+			sb.WriteString(fmt.Sprintf("%d. **[%s](%s)**", i+1, e.VideoTitle, e.VideoURL))
+			if len(e.Speakers) > 0 {
+				sb.WriteString(fmt.Sprintf(" — *%s*", strings.Join(e.Speakers, ", ")))
+			}
+			if e.Relevance != "" {
+				sb.WriteString(fmt.Sprintf(" — %s", e.Relevance))
+			}
+			sb.WriteString("\n")
 		}
 		sb.WriteString("\n")
 	}

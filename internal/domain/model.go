@@ -50,6 +50,7 @@ type Report struct {
 	VideoURL         string
 	VideoDurationSec int
 	Stardate         string
+	Speakers         []string
 	Summary          string
 	Notes            string // detailed freeform narrative from Gemini covering everything mentioned
 	Technologies     []Technology
@@ -83,6 +84,11 @@ func (c *CachedAnalysis) Tags() []string {
 		names = append(names, t.Name)
 	}
 	return names
+}
+
+// Speakers returns the speaker/presenter names extracted from the analysis report.
+func (c *CachedAnalysis) Speakers() []string {
+	return c.Report.Speakers
 }
 
 // Events returns the playlist titles this video was scanned from.

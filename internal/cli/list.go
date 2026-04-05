@@ -388,6 +388,12 @@ func filterByTag(listings []domain.VideoListing, entries map[string]*domain.Cach
 				goto next
 			}
 		}
+		for _, s := range entry.Speakers() {
+			if strings.Contains(strings.ToLower(s), q) {
+				out = append(out, v)
+				goto next
+			}
+		}
 	next:
 	}
 	return out
