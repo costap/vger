@@ -11,6 +11,7 @@ type VideoMetadata struct {
 	PublishedAt string
 	DurationSec int
 	ViewCount   int64
+	Tags        []string
 }
 
 // VideoListing is a lightweight entry returned when browsing a channel's video catalogue.
