@@ -94,6 +94,11 @@ func retryDelayFromError(err error) time.Duration {
 // retried because repeating the request would produce the same outcome.
 // Non-gRPC errors (e.g. JSON parse failures from truncated responses) are also
 // considered retryable since they indicate a degraded API response.
+//
+// ResourceExhausted (429) is split into two cases:
+//   - With RetryInfo (per-minute quota): retryable — the API provides the exact delay.
+//   - Without RetryInfo (daily quota exhausted): NOT retryable — retrying within the
+//     session cannot help; the quota resets after ~24 hours.
 func isRetryable(err error) bool {
 	if err == nil {
 		return false
@@ -107,13 +112,29 @@ func isRetryable(err error) bool {
 	}
 	switch st.Code() {
 	case codes.Unavailable, // 503 — service temporarily unavailable / high demand
-		codes.ResourceExhausted, // 429 — token quota exceeded; backoff and retry
-		codes.DeadlineExceeded,  // timeout on the server side
-		codes.Aborted:           // transient conflict; safe to retry
+		codes.DeadlineExceeded, // timeout on the server side
+		codes.Aborted:          // transient conflict; safe to retry
 		return true
+	case codes.ResourceExhausted: // 429 — only retryable when RetryInfo is present (RPM quota)
+		return retryDelayFromError(err) > 0
 	default:
 		return false
 	}
+}
+
+// isQuotaExhausted reports whether err is a Gemini 429 RESOURCE_EXHAUSTED error
+// with no RetryInfo detail. This indicates the daily API quota has been consumed
+// rather than a per-minute rate limit — retrying within the current session will
+// not help. The quota typically resets after ~24 hours.
+func isQuotaExhausted(err error) bool {
+	if err == nil {
+		return false
+	}
+	st, ok := status.FromError(err)
+	if !ok {
+		return false
+	}
+	return st.Code() == codes.ResourceExhausted && retryDelayFromError(err) == 0
 }
 
 // isTokenOverflow reports whether err is a Gemini 400 INVALID_ARGUMENT error
@@ -133,4 +154,13 @@ func isTokenOverflow(err error) bool {
 // share the same 1M token context window.
 func isConnectionReset(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "connection reset by peer")
+}
+
+// isModelDeprecated reports whether err indicates the requested model is
+// deprecated or unavailable. This cannot be resolved by retrying — the caller
+// must switch to a supported model. String matching is used (like isTokenOverflow
+// and isConnectionReset) because by the time this is checked the gRPC status may
+// be wrapped in a fmt.Errorf chain, making status.FromError unreliable.
+func isModelDeprecated(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "no longer available")
 }

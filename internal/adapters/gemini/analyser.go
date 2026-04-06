@@ -22,6 +22,12 @@ const defaultModel = "gemini-2.5-flash"
 // server-side processing pipeline that may handle large YouTube videos better.
 const fallbackModel = "gemini-2.5-pro"
 
+// ErrQuotaExhausted is returned by AnalyseVideo when the Gemini quota cannot be
+// recovered after a 65s retry. The original 429 (no RetryInfo) could be either
+// TPM throttle or daily RPD exhaustion — if a 65s wait didn't help, treat it as
+// RPD. The quota resets at midnight Pacific Time.
+var ErrQuotaExhausted = fmt.Errorf("Gemini quota limit persists after retry — likely daily RPD exhausted (resets at midnight PT)\n  run 'vger quota' to see today's usage; check https://aistudio.google.com for details")
+
 const systemPromptBase = `You are an expert in cloud-native technology, Kubernetes, and the CNCF ecosystem.
 You will be given a conference talk video. Analyse it and return a JSON object with exactly this schema:
 
@@ -78,8 +84,10 @@ type technologyResponse struct {
 type Client struct {
 	APIKey     string
 	Model      string
-	cncfClient *cncf.Client  // nil = no tools (single-shot mode)
-	LogFn      func(string)  // optional; called with status messages (e.g. model fallback warnings)
+	cncfClient *cncf.Client // nil = no tools (single-shot mode)
+	LogFn      func(string) // optional; called with status messages (e.g. model fallback warnings)
+	QuotaFn    func()       // optional; called once per GenerateContent dispatch (successful or not)
+	TokenFn    func(int64)  // optional; called with TotalTokenCount after each successful response
 }
 
 // New creates a Client without tool support (single-shot analysis).
@@ -120,11 +128,13 @@ func (c *Client) overloadRetryFn(maxAttempts int) func(attempt int, sleep time.D
 // multi-turn function-calling loop where Gemini invokes tools to verify CNCF
 // stages and validate URLs before producing its final answer.
 //
-// Error handling for oversized videos:
+// Error handling for oversized videos and quota:
 //   - Token overflow (400 INVALID_ARGUMENT): all gemini-2.5 models share the same
 //     1M token limit, so no fallback helps. Returns a clear user-facing error.
 //   - Connection reset: Gemini dropped the TCP connection server-side. The Pro model
 //     uses a different processing pipeline that may handle this better; retried once.
+//   - Daily quota exhausted (429 with no RetryInfo): returns ErrQuotaExhausted so
+//     callers can stop dispatching further requests immediately.
 func (c *Client) AnalyseVideo(ctx context.Context, url string, meta *domain.VideoMetadata) (*domain.Report, error) {
 	if url == "" {
 		return nil, fmt.Errorf("url must not be empty")
@@ -141,6 +151,33 @@ func (c *Client) AnalyseVideo(ctx context.Context, url string, meta *domain.Vide
 	report, err := c.analyseWithModel(ctx, client, meta, url, c.Model)
 	if err != nil {
 		switch {
+		case isModelDeprecated(err):
+			return nil, fmt.Errorf(
+				"model %q is deprecated or unavailable — update with: vger scan --model <name>\n"+
+					"  current recommended models: gemini-2.5-flash (default), gemini-2.5-pro",
+				c.Model)
+		case isQuotaExhausted(err):
+			// 429 without RetryInfo is ambiguous: it may be TPM throttle (clears in
+			// ~60s) or daily RPD exhaustion (doesn't clear until midnight Pacific).
+			// Retry once after 65s — enough to clear the TPM rolling window.
+			// If it fails again, treat as RPD exhaustion and stop dispatching.
+			if c.LogFn != nil {
+				c.LogFn("⏳ quota limit hit (TPM or RPD) — waiting 65s before retry")
+			}
+			select {
+			case <-ctx.Done():
+				return nil, ErrQuotaExhausted
+			case <-time.After(65 * time.Second):
+			}
+			report, err = c.analyseWithModel(ctx, client, meta, url, c.Model)
+			if err != nil {
+				if isQuotaExhausted(err) {
+					return nil, ErrQuotaExhausted
+				}
+				if isModelDeprecated(err) {
+					return nil, fmt.Errorf("model %q is deprecated or unavailable — use gemini-2.5-flash or gemini-2.5-pro", c.Model)
+				}
+			}
 		case isTokenOverflow(err):
 			// Same 1M limit on all 2.5 models — no fallback can help.
 			return nil, fmt.Errorf("video exceeds Gemini's 1M token limit and is too long to analyse (try a shorter clip)")
@@ -150,8 +187,13 @@ func (c *Client) AnalyseVideo(ctx context.Context, url string, meta *domain.Vide
 				c.LogFn(fmt.Sprintf("connection reset on %s — retrying with %s", c.Model, fallbackModel))
 			}
 			report, err = c.analyseWithModel(ctx, client, meta, url, fallbackModel)
-			if err != nil && isTokenOverflow(err) {
-				return nil, fmt.Errorf("video exceeds Gemini's 1M token limit and is too long to analyse (try a shorter clip)")
+			if err != nil {
+				if isQuotaExhausted(err) {
+					return nil, ErrQuotaExhausted
+				}
+				if isTokenOverflow(err) {
+					return nil, fmt.Errorf("video exceeds Gemini's 1M token limit and is too long to analyse (try a shorter clip)")
+				}
 			}
 		}
 	}
@@ -214,9 +256,15 @@ func (c *Client) analyseSingleShot(
 	const maxAttempts = 7
 	var report *domain.Report
 	err := withRetry(ctx, maxAttempts, c.overloadRetryFn(maxAttempts), func() error {
+		if c.QuotaFn != nil {
+			c.QuotaFn()
+		}
 		resp, callErr := client.Models.GenerateContent(ctx, model, contents, config)
 		if callErr != nil {
 			return callErr
+		}
+		if c.TokenFn != nil && resp.UsageMetadata != nil {
+			c.TokenFn(int64(resp.UsageMetadata.TotalTokenCount))
 		}
 		var parseErr error
 		report, parseErr = parseReport(resp.Text(), meta, url)
@@ -252,10 +300,16 @@ func (c *Client) analyseWithTools(
 
 		const maxAttempts = 7
 		err := withRetry(ctx, maxAttempts, c.overloadRetryFn(maxAttempts), func() error {
+			if c.QuotaFn != nil {
+				c.QuotaFn()
+			}
 			var callErr error
 			resp, callErr = client.Models.GenerateContent(ctx, model, contents, config)
 			if callErr != nil {
 				return callErr
+			}
+			if c.TokenFn != nil && resp.UsageMetadata != nil {
+				c.TokenFn(int64(resp.UsageMetadata.TotalTokenCount))
 			}
 			fcs = resp.FunctionCalls()
 			if len(fcs) == 0 {

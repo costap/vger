@@ -13,6 +13,7 @@ var geminiAPIKey string
 var youtubeAPIKey string
 var geminiModel string
 var userContext string // loaded from ~/.vger/config.yaml at startup
+var quotaTier string   // loaded from ~/.vger/config.yaml at startup (e.g. "free", "1", "2", "3")
 
 // Root is the top-level cobra command.
 var Root = &cobra.Command{
@@ -40,6 +41,7 @@ and produces structured summaries with technology learning recommendations.`,
 		// Load user context from config (best-effort; missing config is fine).
 		if cfg, err := config.Load(); err == nil {
 			userContext = cfg.UserContext
+			quotaTier = cfg.QuotaTier
 		}
 		ui.Header()
 	},
@@ -48,7 +50,7 @@ and produces structured summaries with technology learning recommendations.`,
 func init() {
 	Root.PersistentFlags().StringVar(&geminiAPIKey, "gemini-key", "", "Gemini API key (env: GEMINI_API_KEY, .env)")
 	Root.PersistentFlags().StringVar(&youtubeAPIKey, "youtube-key", "", "YouTube Data API key (env: YOUTUBE_API_KEY, .env)")
-	Root.PersistentFlags().StringVar(&geminiModel, "model", "gemini-2.5-flash", "Gemini model to use")
+	Root.PersistentFlags().StringVar(&geminiModel, "model", "gemini-2.5-flash", "Gemini model to use (e.g. gemini-2.5-flash, gemini-2.5-pro)")
 
 	Root.AddCommand(scanCmd)
 	Root.AddCommand(listCmd)
@@ -56,5 +58,6 @@ func init() {
 	Root.AddCommand(digestCmd)
 	Root.AddCommand(researchCmd)
 	Root.AddCommand(configCmd)
+	Root.AddCommand(quotaCmd)
 	Root.AddCommand(track.Cmd())
 }

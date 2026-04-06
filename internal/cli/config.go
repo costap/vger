@@ -41,6 +41,11 @@ var configShowCmd = &cobra.Command{
 				fmt.Println("  " + line)
 			}
 		}
+		if cfg.QuotaTier == "" {
+			fmt.Println(ui.DimStyle().Render("quota_tier:   (not set — run: vger config set quota_tier 1)"))
+		} else {
+			ui.Field("quota_tier  ", cfg.QuotaTier)
+		}
 		configPath, _ := config.DefaultPath()
 		fmt.Println(ui.DimStyle().Render("\nConfig file: " + configPath))
 		return nil
@@ -55,9 +60,12 @@ var configSetCmd = &cobra.Command{
 Supported fields:
   user_context   Persistent context injected into all Gemini prompts.
                  Describe your stack, team, and goals so answers are tailored.
+  quota_tier     Gemini API billing tier for quota estimates.
+                 Valid values: free, 1, 2, 3
 
 Example:
-  vger config set user_context "We run AWS EKS 1.29, Go microservices, Cilium CNI."`,
+  vger config set user_context "We run AWS EKS 1.29, Go microservices, Cilium CNI."
+  vger config set quota_tier 1`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		field := strings.ToLower(args[0])
@@ -72,8 +80,17 @@ Example:
 		switch field {
 		case "user_context":
 			cfg.UserContext = value
+		case "quota_tier":
+			switch value {
+			case "free", "1", "2", "3":
+				cfg.QuotaTier = value
+			default:
+				err := fmt.Errorf("invalid quota_tier %q — valid values: free, 1, 2, 3", value)
+				ui.RedAlert(err)
+				return err
+			}
 		default:
-			err := fmt.Errorf("unknown config field %q — supported: user_context", field)
+			err := fmt.Errorf("unknown config field %q — supported: user_context, quota_tier", field)
 			ui.RedAlert(err)
 			return err
 		}
@@ -94,7 +111,8 @@ var configClearCmd = &cobra.Command{
 	Long: `Clear a configuration field, removing it from ~/.vger/config.yaml.
 
 Example:
-  vger config clear user_context`,
+  vger config clear user_context
+  vger config clear quota_tier`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		field := strings.ToLower(args[0])
@@ -108,8 +126,10 @@ Example:
 		switch field {
 		case "user_context":
 			cfg.UserContext = ""
+		case "quota_tier":
+			cfg.QuotaTier = ""
 		default:
-			err := fmt.Errorf("unknown config field %q — supported: user_context", field)
+			err := fmt.Errorf("unknown config field %q — supported: user_context, quota_tier", field)
 			ui.RedAlert(err)
 			return err
 		}
