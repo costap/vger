@@ -3,6 +3,7 @@ package gemini
 import (
 	"context"
 	"math/rand/v2"
+	"strings"
 	"time"
 
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -12,7 +13,7 @@ import (
 
 const (
 	retryBaseDelay  = 5 * time.Second
-	retryMaxDelay   = 90 * time.Second // covers the ~53s API-suggested delay for quota resets
+	retryMaxDelay   = 3 * time.Minute // demand spikes can last 1–3 min; give enough headroom
 	retryMultiplier = 2.0
 	retryJitter     = 0.25 // ±25% of the computed delay
 )
@@ -21,7 +22,11 @@ const (
 // errors with exponential backoff and jitter. When the API provides an explicit
 // retry delay via RetryInfo, that delay is used in preference to the computed one.
 // Returns the last error if all attempts are exhausted, or ctx.Err() if cancelled.
-func withRetry(ctx context.Context, maxAttempts int, fn func() error) error {
+//
+// onRetry, if non-nil, is called before each sleep with the current attempt number
+// (1-based), the computed sleep duration, and the error that triggered the retry.
+// Callers can use this to surface user-visible warnings for specific error types.
+func withRetry(ctx context.Context, maxAttempts int, onRetry func(attempt int, sleep time.Duration, err error), fn func() error) error {
 	var err error
 	delay := retryBaseDelay
 
@@ -45,6 +50,10 @@ func withRetry(ctx context.Context, maxAttempts int, fn func() error) error {
 		if sleep <= 0 {
 			jitter := 1.0 + retryJitter*(2*rand.Float64()-1)
 			sleep = time.Duration(float64(delay) * jitter)
+		}
+
+		if onRetry != nil {
+			onRetry(attempt, sleep, err)
 		}
 
 		select {
@@ -92,6 +101,8 @@ func isRetryable(err error) bool {
 	st, ok := status.FromError(err)
 	if !ok {
 		// Not a gRPC status error — treat as retryable (e.g. JSON parse of truncated response).
+		// Exception: token overflow errors returned as wrapped strings are handled by
+		// isTooLargeError in the caller and should NOT burn retry budget here.
 		return true
 	}
 	switch st.Code() {
@@ -103,4 +114,23 @@ func isRetryable(err error) bool {
 	default:
 		return false
 	}
+}
+
+// isTokenOverflow reports whether err is a Gemini 400 INVALID_ARGUMENT error
+// indicating the video's token count exceeds the model's context window (1M
+// tokens for all gemini-2.5 models). No model fallback can resolve this — all
+// 2.5-series models share the same 1,048,576 token limit. The caller should
+// surface a clear user-facing message and skip any fallback attempt.
+func isTokenOverflow(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "token count exceeds")
+}
+
+// isConnectionReset reports whether err is a TCP connection reset from the
+// Gemini API server. This typically indicates a server-side processing timeout
+// for very large videos on YouTube URL passthrough. Unlike token overflow, the
+// root cause is not a hard token limit — retrying with gemini-2.5-pro (which
+// uses a different server-side pipeline) may succeed even though both models
+// share the same 1M token context window.
+func isConnectionReset(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "connection reset by peer")
 }

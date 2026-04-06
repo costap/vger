@@ -5,14 +5,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"google.golang.org/genai"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/costap/vger/internal/adapters/cncf"
 	"github.com/costap/vger/internal/domain"
 )
 
 const defaultModel = "gemini-2.5-flash"
+
+// fallbackModel is used when a connection reset occurs on the primary model.
+// Both 2.5-series models share the same 1M token limit, but Pro uses a different
+// server-side processing pipeline that may handle large YouTube videos better.
+const fallbackModel = "gemini-2.5-pro"
 
 const systemPromptBase = `You are an expert in cloud-native technology, Kubernetes, and the CNCF ecosystem.
 You will be given a conference talk video. Analyse it and return a JSON object with exactly this schema:
@@ -70,7 +78,8 @@ type technologyResponse struct {
 type Client struct {
 	APIKey     string
 	Model      string
-	cncfClient *cncf.Client // nil = no tools (single-shot mode)
+	cncfClient *cncf.Client  // nil = no tools (single-shot mode)
+	LogFn      func(string)  // optional; called with status messages (e.g. model fallback warnings)
 }
 
 // New creates a Client without tool support (single-shot analysis).
@@ -89,12 +98,33 @@ func NewWithTools(apiKey, model string, cncfClient *cncf.Client) *Client {
 	return c
 }
 
+// overloadRetryFn returns an onRetry callback for withRetry that logs a
+// user-visible warning when Gemini returns a 503 UNAVAILABLE (high demand).
+// Returns nil when LogFn is not set (withRetry is nil-safe for onRetry).
+func (c *Client) overloadRetryFn(maxAttempts int) func(attempt int, sleep time.Duration, err error) {
+	if c.LogFn == nil {
+		return nil
+	}
+	return func(attempt int, sleep time.Duration, err error) {
+		st, ok := status.FromError(err)
+		if ok && st.Code() == codes.Unavailable {
+			c.LogFn(fmt.Sprintf("⚠ Gemini overloaded (attempt %d/%d, retrying in %s)", attempt, maxAttempts, sleep.Round(time.Second)))
+		}
+	}
+}
+
 // AnalyseVideo passes the video URL directly to the Gemini multimodal API
 // and returns a structured report. No video download is performed.
 //
 // When a cncfClient was provided via NewWithTools, the analysis runs as a
 // multi-turn function-calling loop where Gemini invokes tools to verify CNCF
 // stages and validate URLs before producing its final answer.
+//
+// Error handling for oversized videos:
+//   - Token overflow (400 INVALID_ARGUMENT): all gemini-2.5 models share the same
+//     1M token limit, so no fallback helps. Returns a clear user-facing error.
+//   - Connection reset: Gemini dropped the TCP connection server-side. The Pro model
+//     uses a different processing pipeline that may handle this better; retried once.
 func (c *Client) AnalyseVideo(ctx context.Context, url string, meta *domain.VideoMetadata) (*domain.Report, error) {
 	if url == "" {
 		return nil, fmt.Errorf("url must not be empty")
@@ -108,6 +138,35 @@ func (c *Client) AnalyseVideo(ctx context.Context, url string, meta *domain.Vide
 		return nil, fmt.Errorf("create gemini client: %w", err)
 	}
 
+	report, err := c.analyseWithModel(ctx, client, meta, url, c.Model)
+	if err != nil {
+		switch {
+		case isTokenOverflow(err):
+			// Same 1M limit on all 2.5 models — no fallback can help.
+			return nil, fmt.Errorf("video exceeds Gemini's 1M token limit and is too long to analyse (try a shorter clip)")
+		case isConnectionReset(err) && c.Model != fallbackModel:
+			// Server-side timeout; Pro pipeline may handle it better.
+			if c.LogFn != nil {
+				c.LogFn(fmt.Sprintf("connection reset on %s — retrying with %s", c.Model, fallbackModel))
+			}
+			report, err = c.analyseWithModel(ctx, client, meta, url, fallbackModel)
+			if err != nil && isTokenOverflow(err) {
+				return nil, fmt.Errorf("video exceeds Gemini's 1M token limit and is too long to analyse (try a shorter clip)")
+			}
+		}
+	}
+	return report, err
+}
+
+// analyseWithModel runs analysis for url using the specified model name,
+// building the request contents fresh so that each attempt is independent.
+func (c *Client) analyseWithModel(
+	ctx context.Context,
+	client *genai.Client,
+	meta *domain.VideoMetadata,
+	url string,
+	model string,
+) (*domain.Report, error) {
 	prompt := systemPromptBase
 	if c.cncfClient != nil {
 		prompt += systemPromptToolSuffix
@@ -133,9 +192,9 @@ func (c *Client) AnalyseVideo(ctx context.Context, url string, meta *domain.Vide
 	}
 
 	if c.cncfClient != nil {
-		return c.analyseWithTools(ctx, client, contents, meta, url)
+		return c.analyseWithTools(ctx, client, contents, meta, url, model)
 	}
-	return c.analyseSingleShot(ctx, client, contents, meta, url)
+	return c.analyseSingleShot(ctx, client, contents, meta, url, model)
 }
 
 // analyseSingleShot performs a single GenerateContent call with JSON MIME type enforcement.
@@ -147,13 +206,15 @@ func (c *Client) analyseSingleShot(
 	contents []*genai.Content,
 	meta *domain.VideoMetadata,
 	url string,
+	model string,
 ) (*domain.Report, error) {
 	config := &genai.GenerateContentConfig{
 		ResponseMIMEType: "application/json",
 	}
+	const maxAttempts = 7
 	var report *domain.Report
-	err := withRetry(ctx, 5, func() error {
-		resp, callErr := client.Models.GenerateContent(ctx, c.Model, contents, config)
+	err := withRetry(ctx, maxAttempts, c.overloadRetryFn(maxAttempts), func() error {
+		resp, callErr := client.Models.GenerateContent(ctx, model, contents, config)
 		if callErr != nil {
 			return callErr
 		}
@@ -175,6 +236,7 @@ func (c *Client) analyseWithTools(
 	contents []*genai.Content,
 	meta *domain.VideoMetadata,
 	url string,
+	model string,
 ) (*domain.Report, error) {
 	tools := newToolSet(c.cncfClient)
 	config := &genai.GenerateContentConfig{
@@ -188,9 +250,10 @@ func (c *Client) analyseWithTools(
 		var fcs []*genai.FunctionCall
 		var report *domain.Report
 
-		err := withRetry(ctx, 5, func() error {
+		const maxAttempts = 7
+		err := withRetry(ctx, maxAttempts, c.overloadRetryFn(maxAttempts), func() error {
 			var callErr error
-			resp, callErr = client.Models.GenerateContent(ctx, c.Model, contents, config)
+			resp, callErr = client.Models.GenerateContent(ctx, model, contents, config)
 			if callErr != nil {
 				return callErr
 			}
@@ -237,6 +300,7 @@ func parseReport(raw string, meta *domain.VideoMetadata, url string) (*domain.Re
 
 	raw = stripCodeFences(raw)
 	raw = extractJSONObject(raw)
+	raw = sanitizeJSONControls(raw)
 
 	var ar analysisResponse
 	if err := json.Unmarshal([]byte(raw), &ar); err != nil {
@@ -289,6 +353,52 @@ func stripCodeFences(s string) string {
 		}
 	}
 	return s
+}
+
+// sanitizeJSONControls replaces bare control characters inside JSON string
+// literals with their valid JSON escape sequences. Gemini occasionally emits
+// literal newlines or carriage returns inside strings (e.g. in the notes field),
+// making the JSON technically invalid. This pass fixes them before unmarshal.
+//
+// It only rewrites characters found inside string values — control characters
+// outside strings (whitespace between tokens) are left untouched.
+func sanitizeJSONControls(s string) string {
+	var buf strings.Builder
+	buf.Grow(len(s))
+	inString := false
+	escaped := false
+	for _, ch := range s {
+		if escaped {
+			buf.WriteRune(ch)
+			escaped = false
+			continue
+		}
+		if ch == '\\' && inString {
+			buf.WriteRune(ch)
+			escaped = true
+			continue
+		}
+		if ch == '"' {
+			inString = !inString
+			buf.WriteRune(ch)
+			continue
+		}
+		if inString {
+			switch ch {
+			case '\n':
+				buf.WriteString(`\n`)
+			case '\r':
+				buf.WriteString(`\r`)
+			case '\t':
+				buf.WriteString(`\t`)
+			default:
+				buf.WriteRune(ch)
+			}
+		} else {
+			buf.WriteRune(ch)
+		}
+	}
+	return buf.String()
 }
 
 // deduplicateSpeakers removes duplicate and blank entries from the speakers list,

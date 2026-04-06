@@ -70,7 +70,39 @@ Covers all improvements to how vger ingests, processes, and pre-processes video 
 
 ---
 
-### T3-4 · Non-YouTube inputs (local files, Vimeo)
+### · Long-video fallback — transcript-only analysis
+**Priority:** Tier 2 · Effort: M
+
+**As a** user scanning a long conference session (>90 min) that exceeds Gemini's 1M token limit,  
+**I want** vger to automatically fall back to a transcript-only analysis mode,  
+**so that** I still get a useful summary instead of a hard failure.
+
+**Background:**  
+Gemini multimodal video analysis encodes full video frames + audio, easily overflowing the 1M token context window for talks longer than ~60-90 minutes. The YouTube Data API provides closed-caption transcripts (VTT/SRT) for most conference talks — these are pure text and consume a fraction of the tokens, enabling analysis of even 3-hour recordings.
+
+**Acceptance criteria:**
+- When a video fails with a token overflow error, vger automatically fetches the YouTube transcript via the Captions API and retries using text-only Gemini analysis
+- User sees a warning: `⚠ video too long for multimodal analysis — retrying with transcript only`
+- Transcript-only reports are annotated in the cache and displayed with a `[transcript]` indicator
+- `vger scan --transcript` flag forces transcript-only mode (skips multimodal, useful for large playlists)
+- Graceful degradation when no transcript is available: keep the token overflow error message
+- Speaker detection still attempted (transcript often includes speaker labels in VTT format)
+
+**Implementation notes:**
+- `internal/adapters/youtube/captions.go` — new `FetchTranscript(videoID string) (string, error)` using YouTube Data API v3 `/captions` + download endpoint (requires OAuth or API key with captions scope)
+- Alternative: `yt-dlp --write-auto-subs` as a fallback if API captions are unavailable; detect yt-dlp presence at runtime
+- `internal/adapters/gemini/analyser.go` — add `AnalyseTranscript(ctx, transcript string, meta) (*domain.Report, error)` path with a text-only prompt variant
+- `domain.Report` — add `TranscriptOnly bool` field to mark degraded reports
+- `internal/cli/scan.go` — wire automatic fallback after `isTokenOverflow`; add `--transcript` flag
+
+**Limitations to document:**
+- Transcript-only analysis loses visual information (slides, demos, architecture diagrams)
+- Auto-generated YouTube captions have lower accuracy than manual captions
+- Some videos have no captions at all (livestreams, private uploads)
+
+---
+
+
 **Priority:** Tier 3 · Effort: L
 
 **As a** user with conference recordings not on YouTube,  
