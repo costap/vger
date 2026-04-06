@@ -164,6 +164,14 @@ func runPlaylistScan(cmd *cobra.Command) error {
 		sem     = make(chan struct{}, scanConcurrency)
 	)
 
+	// Wire fallback notifications so the user sees when a video is retried with
+	// a larger-context model. The callback is goroutine-safe via mu.
+	gmClient.LogFn = func(msg string) {
+		mu.Lock()
+		ui.Status("  ⚠  " + msg)
+		mu.Unlock()
+	}
+
 	for i, v := range videos {
 		idx := i + 1
 		videoURL := v.URL

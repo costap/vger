@@ -58,6 +58,7 @@ Prompt       →  track add      →                → track digest  →
 | T2-3 | `vger research --create-signal` — auto-capture signals | [research](epic-research.md) | S |
 | T2-4 | Technology trend analysis (`vger digest --trend`) | [digest](epic-digest.md) | M |
 | T2-5 | `vger scan --from-file <urls.txt>` — batch from file | [scan](epic-scan.md) | S |
+| T2-8 | Long-video fallback — transcript-only analysis | [scan](epic-scan.md) | M |
 | T2-6 | `vger export --format obsidian` — knowledge base export | [new commands](epic-new-commands.md) | M |
 | T2-7 | `vger compare <topic-a> <topic-b>` — side-by-side analysis | [new commands](epic-new-commands.md) | M |
 
