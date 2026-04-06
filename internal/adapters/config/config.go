@@ -13,6 +13,11 @@ type Config struct {
 	// When non-empty it is automatically prepended to all Gemini prompts so that
 	// ask, research, and digest answers are tailored to the user's context.
 	UserContext string `yaml:"user_context,omitempty"`
+
+	// QuotaTier is the Gemini API billing tier for this project.
+	// Valid values: "free", "1", "2", "3". Empty means unknown.
+	// Set with: vger config set quota_tier 1
+	QuotaTier string `yaml:"quota_tier,omitempty"`
 }
 
 // DefaultPath returns ~/.vger/config.yaml.
