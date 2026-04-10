@@ -62,9 +62,9 @@ func extractVideoID(rawURL string) (string, error) {
 // iso8601DurationRe matches the PT#H#M#S format returned by the YouTube API.
 var iso8601DurationRe = regexp.MustCompile(`PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?`)
 
-// parseISO8601Duration converts an ISO 8601 duration string (e.g. "PT1H15M30S") to seconds.
-// Returns 0 if the string does not match the expected pattern.
-func parseISO8601Duration(d string) int {
+// ParseISO8601Duration converts an ISO 8601 duration string (e.g. "PT1H15M30S") to seconds.
+// Returns 0 if the string does not match the expected pattern or is empty.
+func ParseISO8601Duration(d string) int {
 	m := iso8601DurationRe.FindStringSubmatch(d)
 	if m == nil {
 		return 0

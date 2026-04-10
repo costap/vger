@@ -47,7 +47,7 @@ func (c *Client) FetchMetadata(ctx context.Context, rawURL string) (*domain.Vide
 		Description: item.Snippet.Description,
 		ChannelName: item.Snippet.ChannelTitle,
 		PublishedAt: item.Snippet.PublishedAt,
-		DurationSec: parseISO8601Duration(item.ContentDetails.Duration),
+		DurationSec: ParseISO8601Duration(item.ContentDetails.Duration),
 		ViewCount:   int64(item.Statistics.ViewCount),
 	}, nil
 }

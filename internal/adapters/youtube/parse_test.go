@@ -88,9 +88,9 @@ func TestParseISO8601Duration(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.input, func(t *testing.T) {
-			got := parseISO8601Duration(tc.input)
+			got := ParseISO8601Duration(tc.input)
 			if got != tc.want {
-				t.Errorf("parseISO8601Duration(%q) = %d, want %d", tc.input, got, tc.want)
+				t.Errorf("ParseISO8601Duration(%q) = %d, want %d", tc.input, got, tc.want)
 			}
 		})
 	}
