@@ -50,6 +50,13 @@ var wellKnownChannels = []string{
 	"@vmwarecloudnativeapps816\tVMware Cloud Native Apps",
 	"@PlatformEngineering\tPlatform Engineering",
 	"@kubesimplify\tKube Simplify",
+	// Databases & data management
+	"@Redisinc\tRedis Inc",
+	"@CMUDatabaseGroup\tCarnegie Mellon Database Group",
+	"@valkeyproject\tValkey Project",
+	"@cockroachdb\tCockroach Labs",
+	"@PostgresConference\tPostgres Conference",
+	"@MySQL\tMySQL",
 	// Go language
 	"@GolangChannel\tGolang Channel",
 	"@golang\tGo Language",
