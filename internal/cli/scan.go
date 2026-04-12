@@ -22,6 +22,8 @@ import (
 var scanRefresh bool
 var scanPlaylist string
 var scanConcurrency int
+var scanMaxDuration int
+var scanFallbackModel string
 
 var scanCmd = &cobra.Command{
 	Use:   "scan [youtube-url]",
@@ -42,6 +44,8 @@ func init() {
 	scanCmd.Flags().BoolVar(&scanRefresh, "refresh", false, "Re-analyse even if a cached result exists")
 	scanCmd.Flags().StringVar(&scanPlaylist, "playlist", "", "Playlist ID or URL — scan all videos in the playlist")
 	scanCmd.Flags().IntVar(&scanConcurrency, "concurrency", 1, "Number of videos to analyse in parallel (playlist mode); lower values reduce Gemini API demand")
+	scanCmd.Flags().IntVar(&scanMaxDuration, "max-duration", 0, "Skip playlist videos longer than this many minutes (0 = no limit)")
+	scanCmd.Flags().StringVar(&scanFallbackModel, "fallback-model", "", "Retry with this model if primary model hits quota (e.g. gemini-2.5-pro)")
 }
 
 // newQuotaTracker creates a quota tracker, logging a warning if unavailable.
@@ -63,33 +67,11 @@ func newQuotaTracker() *quota.Tracker {
 // heuristic derived from ~1M tokens per 90-minute video. Returns 800_000 when
 // the duration is empty or cannot be parsed. Result is clamped to [100K, 1M].
 func estimateVideoTokens(iso8601 string) int64 {
-	if iso8601 == "" {
+	secs := youtube.ParseISO8601Duration(iso8601)
+	if secs == 0 {
 		return 800_000
 	}
-	// Parse the ISO 8601 duration manually (no stdlib support).
-	// Format: PT[nH][nM][nS]
-	s := strings.TrimPrefix(iso8601, "PT")
-	var totalSec int64
-	var acc int64
-	for _, ch := range s {
-		switch {
-		case ch >= '0' && ch <= '9':
-			acc = acc*10 + int64(ch-'0')
-		case ch == 'H':
-			totalSec += acc * 3600
-			acc = 0
-		case ch == 'M':
-			totalSec += acc * 60
-			acc = 0
-		case ch == 'S':
-			totalSec += acc
-			acc = 0
-		}
-	}
-	if totalSec == 0 {
-		return 800_000
-	}
-	tokens := totalSec * 200
+	tokens := int64(secs) * 200
 	if tokens < 100_000 {
 		return 100_000
 	}
@@ -139,8 +121,19 @@ func runSingleScan(cmd *cobra.Command, url string) error {
 
 	report, meta, err := a.Run(cmd.Context(), url)
 	if err != nil {
-		ui.RedAlert(err)
-		return err
+		if errors.Is(err, gemini.ErrQuotaExhausted) && scanFallbackModel != "" {
+			ui.Status(fmt.Sprintf("⚠ Quota exhausted on %s — retrying with fallback model %s...", geminiModel, scanFallbackModel))
+			fbGmClient := gemini.NewWithTools(geminiAPIKey, scanFallbackModel, cncf.New(cacheDir))
+			if qt := newQuotaTracker(); qt != nil {
+				fbGmClient.QuotaFn = func() { qt.Increment(1) }
+			}
+			fbAgent := agent.New(ytClient, fbGmClient)
+			report, meta, err = fbAgent.Run(cmd.Context(), url)
+		}
+		if err != nil {
+			ui.RedAlert(err)
+			return err
+		}
 	}
 
 	report.Stardate = ui.Stardate()
@@ -188,6 +181,14 @@ func runPlaylistScan(cmd *cobra.Command) error {
 		tpmWindow = &quota.TPMWindow{}
 	}
 
+	// Set up fallback agent (used when primary model hits quota exhaustion).
+	var fallbackAgent *agent.ScanAgent
+	var fallbackGmClient *gemini.Client
+	if scanFallbackModel != "" {
+		fallbackGmClient = gemini.NewWithTools(geminiAPIKey, scanFallbackModel, cncf.New(cacheDir))
+		fallbackAgent = agent.New(ytClient, fallbackGmClient)
+	}
+
 	playlistID, err := ytClient.ExtractPlaylistID(scanPlaylist)
 	if err != nil {
 		ui.RedAlert(err)
@@ -212,6 +213,13 @@ func runPlaylistScan(cmd *cobra.Command) error {
 	if len(videos) == 0 {
 		ui.Complete("No videos found in playlist.")
 		return nil
+	}
+
+	// Enrich all videos with duration and view count (needed for max-duration
+	// filtering and improves TPM estimation accuracy). Best-effort: if this
+	// fails we proceed without durations (filtering/throttling degrade gracefully).
+	if err := ytClient.EnrichWithDetails(cmd.Context(), videos); err != nil {
+		ui.Status(fmt.Sprintf("Warning: could not enrich video details (duration unavailable): %v", err))
 	}
 
 	c := cache.New(cacheDir)
@@ -256,30 +264,42 @@ func runPlaylistScan(cmd *cobra.Command) error {
 	}
 
 	var (
-		scanned      atomic.Int64
-		skipped      atomic.Int64
-		failed       atomic.Int64
-		quotaSkipped atomic.Int64
-		quotaBreaker atomic.Bool // set true when daily quota is exhausted
-		mu           sync.Mutex
-		wg           sync.WaitGroup
-		sem          = make(chan struct{}, scanConcurrency)
+		scanned         atomic.Int64
+		skipped         atomic.Int64
+		failed          atomic.Int64
+		quotaSkipped    atomic.Int64
+		durationSkipped atomic.Int64
+		fallbackUsed    atomic.Int64
+		quotaBreaker    atomic.Bool // set true when daily quota is exhausted
+		mu              sync.Mutex
+		wg              sync.WaitGroup
+		sem             = make(chan struct{}, scanConcurrency)
 	)
 
 	// Wire fallback notifications so the user sees when a video is retried with
 	// a larger-context model. The callback is goroutine-safe via mu.
-	gmClient.LogFn = func(msg string) {
+	logFn := func(msg string) {
 		mu.Lock()
 		ui.Status("  ⚠  " + msg)
 		mu.Unlock()
 	}
+	gmClient.LogFn = logFn
+	if fallbackGmClient != nil {
+		fallbackGmClient.LogFn = logFn
+	}
 	// Wire quota tracker: each GenerateContent call increments the counter.
 	if qt != nil {
 		gmClient.QuotaFn = func() { qt.Increment(1) }
+		if fallbackGmClient != nil {
+			fallbackGmClient.QuotaFn = func() { qt.Increment(1) }
+		}
 	}
 	// Wire TPM tracker: record actual token usage after each successful response.
 	if tpmWindow != nil {
 		gmClient.TokenFn = func(tokens int64) { tpmWindow.Add(tokens) }
+		if fallbackGmClient != nil {
+			fallbackGmClient.TokenFn = func(tokens int64) { tpmWindow.Add(tokens) }
+		}
 	}
 
 	for i, v := range videos {
@@ -301,6 +321,21 @@ func runPlaylistScan(cmd *cobra.Command) error {
 				ui.Status(fmt.Sprintf("[%*d/%d] Cached:   %s", len(fmt.Sprintf("%d", total)), idx, total, truncate(title, 60)))
 				mu.Unlock()
 				skipped.Add(1)
+				continue
+			}
+		}
+
+		// Skip videos that exceed the user-configured max duration.
+		// Only applies when --max-duration is set (> 0) and duration was enriched.
+		if scanMaxDuration > 0 && v.Duration != "" {
+			durationSec := youtube.ParseISO8601Duration(v.Duration)
+			if durationSec > 0 && durationSec > scanMaxDuration*60 {
+				durMin := durationSec / 60
+				mu.Lock()
+				ui.Status(fmt.Sprintf("[%*d/%d] Skipped:  %s (duration %dm exceeds --max-duration %dm)",
+					len(fmt.Sprintf("%d", total)), idx, total, truncate(title, 42), durMin, scanMaxDuration))
+				mu.Unlock()
+				durationSkipped.Add(1)
 				continue
 			}
 		}
@@ -345,6 +380,16 @@ func runPlaylistScan(cmd *cobra.Command) error {
 			mu.Unlock()
 
 			report, meta, err := a.Run(cmd.Context(), videoURL)
+			if err != nil && errors.Is(err, gemini.ErrQuotaExhausted) && fallbackAgent != nil {
+				mu.Lock()
+				ui.Status(fmt.Sprintf("[%*d/%d] ⚠ %s quota exhausted — retrying with fallback model %s",
+					len(fmt.Sprintf("%d", total)), idx, total, geminiModel, scanFallbackModel))
+				mu.Unlock()
+				report, meta, err = fallbackAgent.Run(cmd.Context(), videoURL)
+				if err == nil {
+					fallbackUsed.Add(1)
+				}
+			}
 			if err != nil {
 				if errors.Is(err, gemini.ErrQuotaExhausted) {
 					quotaBreaker.Store(true)
@@ -384,6 +429,12 @@ func runPlaylistScan(cmd *cobra.Command) error {
 	ui.Field("failed ", fmt.Sprintf("%d", failed.Load()))
 	if quotaSkipped.Load() > 0 {
 		ui.Field("quota-skipped", fmt.Sprintf("%d", quotaSkipped.Load()))
+	}
+	if fallbackUsed.Load() > 0 {
+		ui.Field("fallback-used", fmt.Sprintf("%d (via %s)", fallbackUsed.Load(), scanFallbackModel))
+	}
+	if durationSkipped.Load() > 0 {
+		ui.Field("duration-skipped", fmt.Sprintf("%d (--max-duration %dm)", durationSkipped.Load(), scanMaxDuration))
 	}
 	ui.Field("total  ", fmt.Sprintf("%d", total))
 	fmt.Println()
