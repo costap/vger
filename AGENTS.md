@@ -78,6 +78,9 @@ V'Ger follows a strict **Hexagonal Architecture (Ports and Adapters)**. Dependen
 
 ```
 vger/
+├── .agents/
+│   └── skills/
+│       └── review-renovate-pr/     # Automated Renovate PR review & safety verification skill
 ├── .github/
 │   ├── renovate.json               # Renovate dependency management configuration
 │   └── workflows/
@@ -150,32 +153,40 @@ Both can be placed in a `.env` file at repository root or passed via CLI flags (
 
 ## 5. Development & Testing Commands
 
-### Build
+A standard [`Makefile`](Makefile) is provided for convenience. Run `make help` to see all available targets.
+
+### Make Targets
 ```bash
+make help        # Display all available targets
+make build       # Compile binary to bin/vger with version stamping
+make test        # Run unit tests
+make test-cover  # Run unit tests and generate coverage report
+make vet         # Run go vet
+make fmt         # Format Go source files (gofmt)
+make fmt-check   # Check formatting without modifying files
+make tidy        # Run go mod tidy
+make verify      # Run go mod verify
+make deps        # List all direct dependencies and current versions
+make outdated    # List direct dependencies with available updates
+make vuln        # Run govulncheck vulnerability scanner
+make ci          # Run full verification suite (tidy, verify, fmt-check, vet, test, build)
+make clean       # Remove bin/ and coverage files
+```
+
+### Direct Go Commands
+```bash
+# Build binary
 go build -o vger ./cmd/vger
-```
 
-### Test
-Run all unit tests:
-```bash
-go test ./...
-```
-
-Run tests with verbose output:
-```bash
+# Run unit tests
 go test -v ./...
-```
 
-Run tests for a specific adapter:
-```bash
+# Run tests for a specific adapter
 go test -v ./internal/adapters/quota/...
 go test -v ./internal/adapters/gemini/...
 go test -v ./internal/adapters/youtube/...
-```
 
-### Code Quality & Formatting
-Verify formatting and vet:
-```bash
+# Code quality & formatting
 go vet ./...
 go fmt ./...
 ```
