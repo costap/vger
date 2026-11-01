@@ -1,6 +1,6 @@
 module github.com/costap/vger
 
-go 1.26.0
+go 1.27.3
 
 require (
 	github.com/charmbracelet/lipgloss v1.1.0
