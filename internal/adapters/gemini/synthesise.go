@@ -35,10 +35,10 @@ Rules:
 - Return only the JSON object. Do not wrap it in markdown code fences.`
 
 type synthesiseResponse struct {
-	OverarchingTheme string             `json:"overarching_theme"`
-	LearningPath     []string           `json:"learning_path"`
-	PriorityTalks    []priorityTalkResp `json:"priority_talks"`
-	KeyInsights      string             `json:"key_insights"`
+	OverarchingTheme string              `json:"overarching_theme"`
+	LearningPath     flexibleStringSlice `json:"learning_path"`
+	PriorityTalks    []priorityTalkResp  `json:"priority_talks"`
+	KeyInsights      string              `json:"key_insights"`
 }
 
 type priorityTalkResp struct {
@@ -88,11 +88,9 @@ func (c *Client) Synthesise(ctx context.Context, entries []*domain.CachedAnalysi
 		return nil, fmt.Errorf("gemini synthesise: %w", err)
 	}
 
-	raw := strings.TrimSpace(resp.Text())
-	raw = strings.TrimPrefix(raw, "```json")
-	raw = strings.TrimPrefix(raw, "```")
-	raw = strings.TrimSuffix(raw, "```")
-	raw = strings.TrimSpace(raw)
+	raw := stripCodeFences(strings.TrimSpace(resp.Text()))
+	raw = extractJSONObject(raw)
+	raw = sanitizeJSONControls(raw)
 
 	var sr synthesiseResponse
 	if err := json.Unmarshal([]byte(raw), &sr); err != nil {
@@ -106,7 +104,7 @@ func (c *Client) Synthesise(ctx context.Context, entries []*domain.CachedAnalysi
 
 	return &domain.DigestReport{
 		OverarchingTheme: sr.OverarchingTheme,
-		LearningPath:     sr.LearningPath,
+		LearningPath:     []string(sr.LearningPath),
 		PriorityTalks:    pt,
 		KeyInsights:      sr.KeyInsights,
 	}, nil
