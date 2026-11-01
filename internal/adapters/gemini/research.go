@@ -52,7 +52,7 @@ Rules:
 - landscape_map: include only projects genuinely relevant to the topic; add projects from the evidence even if not in CNCF landscape data
 - evidence_videos: only include videos from the EVIDENCE section; do not invent titles or URLs
 - investigation_paths: provide 2-4 distinct paths (e.g. "Start with fundamentals", "Production evaluation", "Security angle")
-- competing_approaches: list 2-5 alternatives or complementary technologies
+- competing_approaches: list 2-5 alternatives or complementary technologies (must be a flat array of strings, e.g. ["Approach A", "Approach B"])
 - Return only the JSON object. Do not wrap it in markdown code fences.`
 
 // researchReportJSON is the JSON shape returned by Gemini for research synthesis.
@@ -61,7 +61,7 @@ type researchReportJSON struct {
 	LandscapeMap        []relatedProjectJSON `json:"landscape_map"`
 	EvidenceVideos      []evidenceEntryJSON  `json:"evidence_videos"`
 	InvestigationPaths  []investPathJSON     `json:"investigation_paths"`
-	CompetingApproaches []string             `json:"competing_approaches"`
+	CompetingApproaches flexibleStringSlice  `json:"competing_approaches"`
 	Verdict             string               `json:"verdict"`
 }
 
@@ -80,9 +80,9 @@ type evidenceEntryJSON struct {
 }
 
 type investPathJSON struct {
-	Title       string   `json:"title"`
-	Description string   `json:"description"`
-	Actions     []string `json:"actions"`
+	Title       string              `json:"title"`
+	Description string              `json:"description"`
+	Actions     flexibleStringSlice `json:"actions"`
 }
 
 // ResearchSynthesize sends all gathered research context to Gemini and returns a
@@ -146,6 +146,7 @@ func (c *Client) ResearchSynthesize(
 
 	raw := stripCodeFences(strings.TrimSpace(resp.Text()))
 	raw = extractJSONObject(raw)
+	raw = sanitizeJSONControls(raw)
 
 	var r researchReportJSON
 	if err := json.Unmarshal([]byte(raw), &r); err != nil {
@@ -366,7 +367,7 @@ func toResearchReport(topic string, r researchReportJSON, hits []*domain.CachedA
 		paths[i] = domain.InvestPath{
 			Title:       p.Title,
 			Description: p.Description,
-			Actions:     p.Actions,
+			Actions:     []string(p.Actions),
 		}
 	}
 
@@ -377,7 +378,7 @@ func toResearchReport(topic string, r researchReportJSON, hits []*domain.CachedA
 		EvidenceVideos:      evidence,
 		DiscoveredTalks:     talks,
 		InvestigationPaths:  paths,
-		CompetingApproaches: r.CompetingApproaches,
+		CompetingApproaches: []string(r.CompetingApproaches),
 		Verdict:             r.Verdict,
 	}
 }

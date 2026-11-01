@@ -34,12 +34,12 @@ Rules:
 - Return only the JSON object. Do not wrap it in markdown code fences.`
 
 type parseSignalResponse struct {
-	Title    string   `json:"title"`
-	URL      string   `json:"url"`
-	Source   string   `json:"source"`
-	Category string   `json:"category"`
-	Tags     []string `json:"tags"`
-	Note     string   `json:"note"`
+	Title    string              `json:"title"`
+	URL      string              `json:"url"`
+	Source   string              `json:"source"`
+	Category string              `json:"category"`
+	Tags     flexibleStringSlice `json:"tags"`
+	Note     string              `json:"note"`
 }
 
 // ParseSignalFromPrompt extracts a Signal from a free-text description using Gemini.
@@ -63,11 +63,9 @@ func (c *Client) ParseSignalFromPrompt(ctx context.Context, prompt string) (*dom
 		return nil, fmt.Errorf("gemini parse signal: %w", err)
 	}
 
-	raw := strings.TrimSpace(resp.Text())
-	raw = strings.TrimPrefix(raw, "```json")
-	raw = strings.TrimPrefix(raw, "```")
-	raw = strings.TrimSuffix(raw, "```")
-	raw = strings.TrimSpace(raw)
+	raw := stripCodeFences(strings.TrimSpace(resp.Text()))
+	raw = extractJSONObject(raw)
+	raw = sanitizeJSONControls(raw)
 
 	var pr parseSignalResponse
 	if err := json.Unmarshal([]byte(raw), &pr); err != nil {
@@ -79,7 +77,7 @@ func (c *Client) ParseSignalFromPrompt(ctx context.Context, prompt string) (*dom
 		URL:      pr.URL,
 		Source:   pr.Source,
 		Category: pr.Category,
-		Tags:     pr.Tags,
+		Tags:     []string(pr.Tags),
 		Note:     pr.Note,
 	}, nil
 }

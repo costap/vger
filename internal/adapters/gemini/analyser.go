@@ -66,7 +66,7 @@ const maxToolRounds = 10
 
 // analysisResponse mirrors the JSON schema requested from the model.
 type analysisResponse struct {
-	Speakers     []string             `json:"speakers"`
+	Speakers     flexibleStringSlice  `json:"speakers"`
 	Summary      string               `json:"summary"`
 	Notes        string               `json:"notes"`
 	Technologies []technologyResponse `json:"technologies"`
@@ -365,7 +365,7 @@ func parseReport(raw string, meta *domain.VideoMetadata, url string) (*domain.Re
 		VideoTitle:       meta.Title,
 		VideoURL:         url,
 		VideoDurationSec: meta.DurationSec,
-		Speakers:         deduplicateSpeakers(ar.Speakers),
+		Speakers:         deduplicateSpeakers([]string(ar.Speakers)),
 		Summary:          ar.Summary,
 		Notes:            ar.Notes,
 	}

@@ -31,11 +31,11 @@ Rules:
 - Return only the JSON object. Do not wrap it in markdown code fences.`
 
 type enrichSignalResponse struct {
-	WhatItIs     string   `json:"what_it_is"`
-	Maturity     string   `json:"maturity"`
-	Alternatives []string `json:"alternatives"`
-	StackFit     string   `json:"stack_fit"`
-	NextSteps    []string `json:"next_steps"`
+	WhatItIs     string              `json:"what_it_is"`
+	Maturity     string              `json:"maturity"`
+	Alternatives flexibleStringSlice `json:"alternatives"`
+	StackFit     string              `json:"stack_fit"`
+	NextSteps    flexibleStringSlice `json:"next_steps"`
 }
 
 // EnrichSignal calls Gemini to generate AI context for an existing signal.
@@ -80,11 +80,9 @@ func (c *Client) EnrichSignal(ctx context.Context, sig *domain.Signal, userConte
 		return nil, fmt.Errorf("gemini enrich signal: %w", err)
 	}
 
-	raw := strings.TrimSpace(resp.Text())
-	raw = strings.TrimPrefix(raw, "```json")
-	raw = strings.TrimPrefix(raw, "```")
-	raw = strings.TrimSuffix(raw, "```")
-	raw = strings.TrimSpace(raw)
+	raw := stripCodeFences(strings.TrimSpace(resp.Text()))
+	raw = extractJSONObject(raw)
+	raw = sanitizeJSONControls(raw)
 
 	var er enrichSignalResponse
 	if err := json.Unmarshal([]byte(raw), &er); err != nil {
@@ -95,8 +93,8 @@ func (c *Client) EnrichSignal(ctx context.Context, sig *domain.Signal, userConte
 		EnrichedAt:   time.Now().UTC(),
 		WhatItIs:     er.WhatItIs,
 		Maturity:     er.Maturity,
-		Alternatives: er.Alternatives,
+		Alternatives: []string(er.Alternatives),
 		StackFit:     er.StackFit,
-		NextSteps:    er.NextSteps,
+		NextSteps:    []string(er.NextSteps),
 	}, nil
 }
