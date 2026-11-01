@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/costap/vger/internal/cli/ui"
 	"github.com/costap/vger/internal/domain"
 	"github.com/spf13/cobra"
