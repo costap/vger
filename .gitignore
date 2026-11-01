@@ -1,3 +1,5 @@
 .env
+bin/
+vger
 !AGENTS.md
 !.agents/
