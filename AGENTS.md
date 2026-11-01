@@ -78,6 +78,9 @@ V'Ger follows a strict **Hexagonal Architecture (Ports and Adapters)**. Dependen
 
 ```
 vger/
+├── .agents/
+│   └── skills/
+│       └── review-renovate-pr/     # Automated Renovate PR review & safety verification skill
 ├── .github/
 │   ├── renovate.json               # Renovate dependency management configuration
 │   └── workflows/
