@@ -9,7 +9,15 @@ import (
 	"github.com/costap/vger/internal/cli"
 )
 
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 func main() {
+	cli.SetVersionInfo(version, commit, date)
+
 	// Load .env if present; silently ignore if the file does not exist.
 	_ = godotenv.Load()
 

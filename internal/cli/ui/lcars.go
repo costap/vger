@@ -125,6 +125,18 @@ func Field(key, value string) {
 	)
 }
 
+// VersionCard prints system version and build metadata in LCARS style.
+func VersionCard(version, commit, date, goVersion, platform string) {
+	SectionHeader("SYSTEM VERSION & BUILD METADATA")
+	fmt.Println()
+	Field("Version", version)
+	Field("Git Commit", commit)
+	Field("Build Date", date)
+	Field("Go Version", goVersion)
+	Field("Platform", platform)
+	fmt.Println()
+}
+
 // ListingRow prints a numbered video listing row with cache indicator, duration,
 // view count, and (for cached videos) a line of Gemini-derived technology tags.
 // Pass a non-nil entry to show the ★ indicator and tech tags; nil renders a dim dot.

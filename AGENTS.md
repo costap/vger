@@ -68,7 +68,7 @@ V'Ger follows a strict **Hexagonal Architecture (Ports and Adapters)**. Dependen
 
 4. **`internal/cli/` & `cmd/vger/` (Composition Root)**
    - `cmd/vger/main.go` loads `.env` and executes `cli.Root`.
-   - `internal/cli` defines Cobra commands (`scan`, `list`, `ask`, `digest`, `track`, `research`, `quota`, `config`).
+   - `internal/cli` defines Cobra commands (`scan`, `list`, `ask`, `digest`, `track`, `research`, `quota`, `config`, `version`).
    - Instantiates concrete adapters, injects them into domain ports/agents, and runs workflows.
    - Renders terminal output using `internal/cli/ui` (LCARS theme via `charmbracelet/lipgloss`).
 
@@ -114,6 +114,7 @@ vger/
 │       ├── research.go             # `vger research "<topic>"`
 │       ├── quota.go                # `vger quota`
 │       ├── config.go               # `vger config set|show`
+│       ├── version.go              # `vger version`
 │       ├── channels.go             # Curated list of conference channels & tab-completion
 │       ├── track/                  # `vger track` subcommand tree
 │       │   ├── cmd.go              # Track root command
@@ -159,6 +160,7 @@ A standard [`Makefile`](Makefile) is provided for convenience. Run `make help` t
 ```bash
 make help        # Display all available targets
 make build       # Compile binary to bin/vger with version stamping
+make install     # Install binary locally using go install with version stamping
 make test        # Run unit tests
 make test-cover  # Run unit tests and generate coverage report
 make vet         # Run go vet

@@ -7,6 +7,7 @@ MAIN_PKG    := ./cmd/vger
 # Go toolchain
 GOCMD       := go
 GOBUILD     := $(GOCMD) build
+GOINSTALL   := $(GOCMD) install
 GOTEST      := $(GOCMD) test
 GOVET       := $(GOCMD) vet
 GOFMT       := gofmt
@@ -18,7 +19,7 @@ COMMIT      ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DATE        ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS     := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 
-.PHONY: help all build run test test-cover vet fmt fmt-check tidy verify ci clean deps outdated vuln
+.PHONY: help all build install run test test-cover vet fmt fmt-check tidy verify ci clean deps outdated vuln hooks
 
 ## help: Display this help message (default)
 help:
@@ -32,6 +33,10 @@ all: fmt vet test build
 build:
 	@mkdir -p $(BIN_DIR)
 	$(GOBUILD) -ldflags "$(LDFLAGS)" -o $(BINARY) $(MAIN_PKG)
+
+## install: Install vger binary locally using go install
+install:
+	$(GOINSTALL) -ldflags "$(LDFLAGS)" $(MAIN_PKG)
 
 ## run: Run vger with optional ARGS="..."
 run:

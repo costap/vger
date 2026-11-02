@@ -21,6 +21,16 @@ type tierLimits struct {
 // Tier 1 values are sourced from AI Studio rate limits UI, April 2025 (screenshot-verified).
 // Free tier RPD values match the prior knownRPD map.
 var modelTierLimits = map[string]map[string]tierLimits{
+	"gemini-4-argon": {
+		"1": {RPD: 1_000, RPM: 150, TPM: 2_000_000},
+	},
+	"gemini-4": {
+		"1": {RPD: 1_000, RPM: 150, TPM: 2_000_000},
+	},
+	"gemini-3.8-flash": {
+		"free": {RPD: 20, RPM: 5, TPM: 250_000},
+		"1":    {RPD: 10_000, RPM: 1_000, TPM: 1_000_000},
+	},
 	"gemini-2.5-flash": {
 		"free": {RPD: 1_500, RPM: 10, TPM: 250_000},
 		"1":    {RPD: 10_000, RPM: 1_000, TPM: 1_000_000},
@@ -131,7 +141,10 @@ Configure your billing tier for limit estimates:
 			}
 			if lim.TPM > 0 {
 				tpmNote := ""
-				if strings.HasPrefix(geminiModel, "gemini-2.5-flash") || strings.HasPrefix(geminiModel, "gemini-2.5-pro") {
+				if strings.HasPrefix(geminiModel, "gemini-2.5-flash") ||
+					strings.HasPrefix(geminiModel, "gemini-2.5-pro") ||
+					strings.HasPrefix(geminiModel, "gemini-3.8-flash") ||
+					strings.HasPrefix(geminiModel, "gemini-4") {
 					tpmNote = "  ⚠  practical bottleneck for video analysis (~500K–1M tokens/video)"
 				}
 				ui.Field("TPM    ", fmt.Sprintf("%s tokens/min%s", formatInt(lim.TPM), tpmNote))

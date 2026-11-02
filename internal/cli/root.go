@@ -28,6 +28,7 @@ and produces structured summaries with technology learning recommendations.`,
 		// commands that shell scripts call at runtime for live tab-completion.
 		n := cmd.Name()
 		if n == "__complete" || n == "__completeNoDesc" ||
+			n == "version" ||
 			(cmd.HasParent() && cmd.Parent().Name() == "completion") {
 			return
 		}
@@ -50,7 +51,7 @@ and produces structured summaries with technology learning recommendations.`,
 func init() {
 	Root.PersistentFlags().StringVar(&geminiAPIKey, "gemini-key", "", "Gemini API key (env: GEMINI_API_KEY, .env)")
 	Root.PersistentFlags().StringVar(&youtubeAPIKey, "youtube-key", "", "YouTube Data API key (env: YOUTUBE_API_KEY, .env)")
-	Root.PersistentFlags().StringVar(&geminiModel, "model", "gemini-2.5-flash", "Gemini model to use (e.g. gemini-2.5-flash, gemini-2.5-pro)")
+	Root.PersistentFlags().StringVar(&geminiModel, "model", "gemini-3.8-flash", "Gemini model to use (e.g. gemini-2.5-flash, gemini-2.5-pro, gemini-3.8-flash, gemini-4-argon)")
 
 	Root.AddCommand(scanCmd)
 	Root.AddCommand(listCmd)
@@ -60,4 +61,5 @@ func init() {
 	Root.AddCommand(configCmd)
 	Root.AddCommand(quotaCmd)
 	Root.AddCommand(track.Cmd())
+	Root.AddCommand(versionCmd)
 }
