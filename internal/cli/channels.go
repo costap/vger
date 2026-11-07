@@ -57,6 +57,7 @@ var wellKnownChannels = []string{
 	"@cockroachdb\tCockroach Labs",
 	"@PostgresConference\tPostgres Conference",
 	"@MySQL\tMySQL",
+	"@valkeyproject\tValkey",
 	// Go language
 	"@GolangChannel\tGolang Channel",
 	"@golang\tGo Language",
@@ -69,4 +70,5 @@ var wellKnownChannels = []string{
 	"@DevoxxForever\tDevoxx",
 	"@KodeKloud\tKodeKloud",
 	"@wiggitywhitney\tWhitney Lee",
+	"@stanfordonline\tStanford Online",
 }
