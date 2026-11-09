@@ -4,7 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Config holds user-level vger settings persisted in ~/.vger/config.yaml.
