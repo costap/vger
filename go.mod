@@ -3,7 +3,7 @@ module github.com/costap/vger
 go 1.27.3
 
 require (
-	charm.land/lipgloss/v2 v2.0.6
+	charm.land/lipgloss/v2 v2.1.1
 	github.com/firebase/genkit/go v1.14.0
 	github.com/joho/godotenv v1.5.1
 	github.com/spf13/cobra v1.10.2
